@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Sigma Contact{% endblock %}
+
+{% block brand %}Sigma Contact{% endblock %}
+
+{% block main_class %}contact-main{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+      <h1 class="mb-1">Contacts</h1>
+      <p class="text-secondary mb-0">Identity directory users and external contacts.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-primary" href="/contacts/new">Add external contact</a>
+      {% if identity_sync_configured %}
+      <form method="post" action="/contacts/sync" class="d-inline">
+        <button type="submit" class="btn btn-outline-secondary">Sync from identity</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if let Some(msg) = message %}
+  <div class="alert alert-info" role="status">{{ msg }}</div>
+  {% endif %}
+
+  {% if !identity_sync_configured %}
+  <div class="alert alert-warning" role="note">
+    Identity sync is not configured. Set
+    <code>CONTACT_IDENTITY_ISSUER_URL</code>,
+    <code>CONTACT_IDENTITY_CLIENT_ID</code>, and
+    <code>CONTACT_IDENTITY_CLIENT_SECRET</code> to pull contacts from the identity provider.
+  </div>
+  {% endif %}
+
+  <section class="mb-4">
+    <h2 class="h4">From identity</h2>
+    {% if identity_contacts.is_empty() %}
+    <p class="text-secondary">No identity contacts yet.{% if identity_sync_configured %} Use sync to import realm users.{% endif %}</p>
+    {% else %}
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for contact in identity_contacts %}
+          <tr>
+            <td>{{ contact.display_name }}</td>
+            <td>{% if let Some(email) = contact.email.as_ref() %}{{ email }}{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+            <td class="text-secondary"><small>{{ contact.updated_at }}</small></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2 class="h4">External</h2>
+    {% if external_contacts.is_empty() %}
+    <p class="text-secondary">No external contacts yet.</p>
+    {% else %}
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for contact in external_contacts %}
+          <tr>
+            <td>{{ contact.display_name }}</td>
+            <td>{% if let Some(email) = contact.email.as_ref() %}{{ email }}{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+            <td>{% if let Some(phone) = contact.phone.as_ref() %}{{ phone }}{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+            <td>{% if let Some(notes) = contact.notes.as_ref() %}{{ notes }}{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+            <td class="text-nowrap">
+              <a class="btn btn-sm btn-outline-primary" href="/contacts/{{ contact.id }}/edit">Edit</a>
+              <form method="post" action="/contacts/{{ contact.id }}/delete" class="d-inline" onsubmit="return confirm('Delete this contact?');">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="mt-5">
+    <h2 class="h5">JSON API</h2>
+    <ul class="small text-secondary">
+      <li><code>GET /contacts</code> — list contacts</li>
+      <li><code>POST /contacts</code> — create external contact (JSON body)</li>
+      <li><code>PUT /contacts/{id}</code> — update external contact</li>
+      <li><code>DELETE /contacts/{id}</code> — delete external contact</li>
+      <li><code>POST /contacts/sync</code> — pull users from identity</li>
+    </ul>
+  </section>
+</div>
+{% endblock %}

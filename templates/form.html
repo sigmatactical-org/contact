@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}{% if contact.is_some() %}Edit contact{% else %}New contact{% endif %} — Sigma Contact{% endblock %}
+
+{% block brand %}Sigma Contact{% endblock %}
+
+{% block main_class %}contact-main{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h1>{% if contact.is_some() %}Edit external contact{% else %}Add external contact{% endif %}</h1>
+  <p class="text-secondary">External contacts are stored locally and can be edited or deleted.</p>
+
+  {% if let Some(err) = error %}
+  <div class="alert alert-danger" role="alert">{{ err }}</div>
+  {% endif %}
+
+  <form method="post" action="{% if let Some(c) = contact.as_ref() %}/contacts/{{ c.id }}/edit{% else %}/contacts{% endif %}" class="col-lg-6">
+    <div class="mb-3">
+      <label for="display_name" class="form-label">Display name</label>
+      <input type="text" class="form-control" id="display_name" name="display_name" value="{{ display_name }}" required>
+    </div>
+    <div class="mb-3">
+      <label for="email" class="form-label">Email</label>
+      <input type="email" class="form-control" id="email" name="email" value="{{ email }}">
+    </div>
+    <div class="mb-3">
+      <label for="phone" class="form-label">Phone</label>
+      <input type="text" class="form-control" id="phone" name="phone" value="{{ phone }}">
+    </div>
+    <div class="mb-3">
+      <label for="notes" class="form-label">Notes</label>
+      <textarea class="form-control" id="notes" name="notes" rows="3">{{ notes }}</textarea>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Save</button>
+      <a class="btn btn-outline-secondary" href="/">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
