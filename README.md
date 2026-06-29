@@ -50,9 +50,18 @@ Browser clients call `/api/contacts` on the identity host (with session + CSRF);
 
 ## Development
 
+Standalone clone:
+
 ```bash
 ./scripts/prepare-local.sh
 cargo run -p sigma-contact
+```
+
+Under the sigma workspace (`sigma/commerce/contact`):
+
+```bash
+cd sigma/commerce/contact && ./scripts/prepare-local.sh && cargo run -p sigma-contact
+# or: (cd sigma/commerce && ./scripts/prepare-local.sh && cargo run -p sigma-contact)
 ```
 
 Open http://localhost:8080
