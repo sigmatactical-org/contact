@@ -68,7 +68,9 @@ impl ContactStore {
 
     pub async fn create_external(&mut self, input: CreateContact) -> Result<Contact, StoreError> {
         if input.display_name.trim().is_empty() {
-            return Err(StoreError::InvalidInput("display_name is required".to_string()));
+            return Err(StoreError::InvalidInput(
+                "display_name is required".to_string(),
+            ));
         }
         let contact = Contact::new_external(input);
         self.db.contacts.push(contact.clone());
@@ -91,7 +93,9 @@ impl ContactStore {
             return Err(StoreError::IdentityReadOnly);
         }
         if input.display_name.trim().is_empty() {
-            return Err(StoreError::InvalidInput("display_name is required".to_string()));
+            return Err(StoreError::InvalidInput(
+                "display_name is required".to_string(),
+            ));
         }
         contact.apply_update(input);
         let updated = contact.clone();
@@ -114,7 +118,10 @@ impl ContactStore {
     }
 
     /// Merge identity-sourced contacts; external entries are preserved.
-    pub async fn merge_identity(&mut self, identity_contacts: Vec<Contact>) -> Result<usize, StoreError> {
+    pub async fn merge_identity(
+        &mut self,
+        identity_contacts: Vec<Contact>,
+    ) -> Result<usize, StoreError> {
         self.db
             .contacts
             .retain(|c| c.source != ContactSource::Identity);
