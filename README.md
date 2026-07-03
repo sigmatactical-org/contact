@@ -2,6 +2,8 @@
 
 Contact directory for Sigma Tactical Group. Pulls users from the identity provider (Keycloak), stores external contacts locally, and exposes a simple web UI plus JSON API.
 
+**Internal / admin tool** — not customer-facing. The public storefront is [sigma-store](https://github.com/sigmatactical-org/store); this service is reached only through the [sigma-identity](https://github.com/sigmatactical-org/identity) authenticated proxy.
+
 Repository: https://github.com/sigmatactical-org/contact
 
 Shared site chrome comes from [sigma-theme](https://github.com/sigmatactical-org/sigma-theme).
