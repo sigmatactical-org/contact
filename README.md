@@ -20,7 +20,7 @@ Shared site chrome comes from [sigma-theme](https://github.com/sigmatactical-org
 | Variable | Purpose |
 |----------|---------|
 | `PORT` | Listen port (default `8080`) |
-| `CONTACT_DATA_PATH` | JSON database path (default `data/contacts.json`) |
+| `DATABASE_URL` | PostgreSQL connection URL (default `postgres://sigma:sigma@127.0.0.1:5432/sigma`) |
 | `CONTACT_IDENTITY_ISSUER_URL` | OIDC issuer / realm URL (e.g. `http://127.0.0.1:8101/realms/multcorp`) |
 | `CONTACT_IDENTITY_CLIENT_ID` | Service-account client id for Admin API |
 | `CONTACT_IDENTITY_CLIENT_SECRET` | Service-account client secret |
@@ -88,7 +88,12 @@ Release is in **`.github/workflows/release.yml`** when configured. Locally:
 docker build -f Dockerfile build/image
 ```
 
-Mount a volume at `/app/data` (or set `CONTACT_DATA_PATH`) so contact data persists across restarts.
+Data is stored in the shared PostgreSQL `contact` schema (`contact.snapshot` JSONB table). Start Postgres from [sigma-pg](https://github.com/sigmatactical-org/sigma-pg):
+
+```bash
+git clone https://github.com/sigmatactical-org/sigma-pg
+cd sigma-pg && docker compose -f docker-compose.deps.yml up -d
+```
 
 ## License
 

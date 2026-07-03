@@ -1,11 +1,8 @@
-use std::path::PathBuf;
-
-/// Path to the JSON contact database.
+/// PostgreSQL connection URL (shared Sigma database).
 #[must_use]
-pub fn data_path() -> PathBuf {
-    std::env::var("CONTACT_DATA_PATH")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("data/contacts.json"))
+pub fn database_url() -> String {
+    std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| sigma_pg::DEFAULT_DATABASE_URL.to_string())
 }
 
 /// OIDC issuer URL for the identity provider (Keycloak realm URL).

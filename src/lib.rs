@@ -67,12 +67,12 @@ pub fn routes(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use warp::http::StatusCode;
 
-    fn test_store() -> store::ContactStore {
-        let dir = TempDir::new().unwrap();
-        store::ContactStore::load(dir.path().join("contacts.json")).unwrap()
+    async fn test_store() -> store::ContactStore {
+        store::ContactStore::connect_empty()
+            .await
+            .expect("PostgreSQL required for tests")
     }
 
     #[tokio::test]
@@ -80,7 +80,7 @@ mod tests {
         let res = warp::test::request()
             .method("GET")
             .path("/up")
-            .reply(&routes(test_store()))
+            .reply(&routes(test_store().await))
             .await;
         assert_eq!(res.status(), StatusCode::OK);
     }
@@ -90,7 +90,7 @@ mod tests {
         let res = warp::test::request()
             .method("GET")
             .path("/")
-            .reply(&routes(test_store()))
+            .reply(&routes(test_store().await))
             .await;
         assert_eq!(res.status(), StatusCode::OK);
         let body = std::str::from_utf8(res.body()).unwrap();
@@ -103,7 +103,7 @@ mod tests {
             .method("GET")
             .path("/contacts")
             .header("accept", "application/json")
-            .reply(&routes(test_store()))
+            .reply(&routes(test_store().await))
             .await;
         assert_eq!(res.status(), StatusCode::OK);
         let body: Vec<Contact> = serde_json::from_slice(res.body()).unwrap();
@@ -119,7 +119,7 @@ mod tests {
             .body(
                 r#"{"display_name":"Ada Lovelace","email":"ada@example.com","phone":null,"notes":null}"#,
             )
-            .reply(&routes(test_store()))
+            .reply(&routes(test_store().await))
             .await;
         assert_eq!(res.status(), StatusCode::CREATED);
         let contact: Contact = serde_json::from_slice(res.body()).unwrap();

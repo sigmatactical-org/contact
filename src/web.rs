@@ -70,11 +70,11 @@ fn create_contact_form(
         .and(store)
         .and_then(|form: ContactForm, store: SharedStore| async move {
             let mut store = store.lock().await;
-            let response = match store.create_external(form.into_create()) {
+            let response = match store.create_external(form.into_create()).await {
                 Ok(_) => {
                     warp::redirect::redirect(warp::http::Uri::from_static("/")).into_response()
                 }
-                Err(StoreError::Io(_)) => match templates::render_form_html(
+                Err(StoreError::InvalidInput(_)) => match templates::render_form_html(
                     store.list(),
                     None,
                     Some("Display name is required.".to_string()),
@@ -127,13 +127,13 @@ fn update_contact_form(
         .and_then(
             |id: String, form: ContactForm, store: SharedStore| async move {
                 let mut store = store.lock().await;
-                let response = match store.update_external(&id, form.into_update()) {
+                let response = match store.update_external(&id, form.into_update()).await {
                     Ok(_) => {
                         warp::redirect::redirect(warp::http::Uri::from_static("/")).into_response()
                     }
                     Err(StoreError::NotFound) => return Err(warp::reject::not_found()),
                     Err(StoreError::IdentityReadOnly) => return Err(warp::reject::not_found()),
-                    Err(StoreError::Io(_)) => match templates::render_form_html(
+                    Err(StoreError::InvalidInput(_)) => match templates::render_form_html(
                         store.list(),
                         store.get(&id),
                         Some("Display name is required.".to_string()),
@@ -161,7 +161,7 @@ fn delete_contact_form(
         .and(store)
         .and_then(|id: String, store: SharedStore| async move {
             let mut store = store.lock().await;
-            match store.delete_external(&id) {
+            match store.delete_external(&id).await {
                 Ok(()) => Ok(warp::redirect::redirect(warp::http::Uri::from_static("/"))),
                 Err(StoreError::NotFound) | Err(StoreError::IdentityReadOnly) => {
                     Err(warp::reject::not_found())
@@ -183,7 +183,7 @@ fn sync_contacts_form(
             let sync_result = identity::fetch_identity_contacts().await;
             let mut store = store.lock().await;
             let message = match sync_result {
-                Ok(identity_contacts) => match store.merge_identity(identity_contacts) {
+                Ok(identity_contacts) => match store.merge_identity(identity_contacts).await {
                     Ok(count) => Some(format!("Synced {count} identity contact(s).")),
                     Err(e) => Some(format!("Sync failed: {e}")),
                 },

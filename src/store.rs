@@ -1,8 +1,9 @@
-use std::path::{Path, PathBuf};
-
+use sqlx::PgPool;
 use thiserror::Error;
 
 use crate::model::{Contact, ContactSource, CreateContact, UpdateContact};
+
+const SCHEMA: &str = "contact";
 
 #[derive(Debug, Error)]
 pub enum StoreError {
@@ -10,10 +11,10 @@ pub enum StoreError {
     NotFound,
     #[error("identity contacts cannot be modified")]
     IdentityReadOnly,
+    #[error("database error: {0}")]
+    Database(#[from] anyhow::Error),
     #[error("{0}")]
-    Io(#[from] std::io::Error),
-    #[error("{0}")]
-    Json(#[from] serde_json::Error),
+    InvalidInput(String),
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -23,32 +24,29 @@ struct Database {
 
 #[derive(Debug, Clone)]
 pub struct ContactStore {
-    path: PathBuf,
+    pool: PgPool,
     db: Database,
 }
 
 impl ContactStore {
-    /// Load or initialize the contact database at `path`.
-    pub fn load(path: impl AsRef<Path>) -> Result<Self, StoreError> {
-        let path = path.as_ref().to_path_buf();
-        let db = if path.exists() {
-            let bytes = std::fs::read(&path)?;
-            serde_json::from_slice(&bytes)?
-        } else {
-            if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-            Database::default()
-        };
-        Ok(Self { path, db })
+    /// Connect to PostgreSQL and load the contact snapshot.
+    pub async fn connect() -> Result<Self, StoreError> {
+        let pool = sigma_pg::connect().await?;
+        let db: Database = sigma_pg::load_snapshot(&pool, SCHEMA).await?;
+        Ok(Self { pool, db })
     }
 
-    fn save(&self) -> Result<(), StoreError> {
-        if let Some(parent) = self.path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        let bytes = serde_json::to_vec_pretty(&self.db)?;
-        std::fs::write(&self.path, bytes)?;
+    /// Reset the contact snapshot (tests only).
+    #[cfg(test)]
+    pub async fn connect_empty() -> Result<Self, StoreError> {
+        let pool = sigma_pg::connect().await?;
+        let db = Database::default();
+        sigma_pg::save_snapshot(&pool, SCHEMA, &db).await?;
+        Ok(Self { pool, db })
+    }
+
+    async fn persist(&self) -> Result<(), StoreError> {
+        sigma_pg::save_snapshot(&self.pool, SCHEMA, &self.db).await?;
         Ok(())
     }
 
@@ -68,20 +66,17 @@ impl ContactStore {
         self.db.contacts.iter().find(|c| c.id == id).cloned()
     }
 
-    pub fn create_external(&mut self, input: CreateContact) -> Result<Contact, StoreError> {
+    pub async fn create_external(&mut self, input: CreateContact) -> Result<Contact, StoreError> {
         if input.display_name.trim().is_empty() {
-            return Err(StoreError::Io(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "display_name is required",
-            )));
+            return Err(StoreError::InvalidInput("display_name is required".to_string()));
         }
         let contact = Contact::new_external(input);
         self.db.contacts.push(contact.clone());
-        self.save()?;
+        self.persist().await?;
         Ok(contact)
     }
 
-    pub fn update_external(
+    pub async fn update_external(
         &mut self,
         id: &str,
         input: UpdateContact,
@@ -96,18 +91,15 @@ impl ContactStore {
             return Err(StoreError::IdentityReadOnly);
         }
         if input.display_name.trim().is_empty() {
-            return Err(StoreError::Io(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "display_name is required",
-            )));
+            return Err(StoreError::InvalidInput("display_name is required".to_string()));
         }
         contact.apply_update(input);
         let updated = contact.clone();
-        self.save()?;
+        self.persist().await?;
         Ok(updated)
     }
 
-    pub fn delete_external(&mut self, id: &str) -> Result<(), StoreError> {
+    pub async fn delete_external(&mut self, id: &str) -> Result<(), StoreError> {
         let index = self
             .db
             .contacts
@@ -118,18 +110,18 @@ impl ContactStore {
             return Err(StoreError::IdentityReadOnly);
         }
         self.db.contacts.remove(index);
-        self.save()
+        self.persist().await
     }
 
     /// Merge identity-sourced contacts; external entries are preserved.
-    pub fn merge_identity(&mut self, identity_contacts: Vec<Contact>) -> Result<usize, StoreError> {
+    pub async fn merge_identity(&mut self, identity_contacts: Vec<Contact>) -> Result<usize, StoreError> {
         self.db
             .contacts
             .retain(|c| c.source != ContactSource::Identity);
 
         let count = identity_contacts.len();
         self.db.contacts.extend(identity_contacts);
-        self.save()?;
+        self.persist().await?;
         Ok(count)
     }
 }

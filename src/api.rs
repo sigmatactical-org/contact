@@ -29,6 +29,15 @@ fn json_error(status: StatusCode, message: impl Into<String>) -> Response {
     .into_response()
 }
 
+fn store_error_status(err: &StoreError) -> StatusCode {
+    match err {
+        StoreError::NotFound => StatusCode::NOT_FOUND,
+        StoreError::IdentityReadOnly => StatusCode::FORBIDDEN,
+        StoreError::InvalidInput(_) => StatusCode::BAD_REQUEST,
+        StoreError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
 pub fn routes(
     store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
@@ -79,15 +88,12 @@ fn create_contact(
         .and(store)
         .and_then(|input: CreateContact, store: SharedStore| async move {
             let mut store = store.lock().await;
-            let response = match store.create_external(input) {
+            let response = match store.create_external(input).await {
                 Ok(contact) => {
                     warp::reply::with_status(warp::reply::json(&contact), StatusCode::CREATED)
                         .into_response()
                 }
-                Err(StoreError::Io(e)) if e.kind() == std::io::ErrorKind::InvalidInput => {
-                    json_error(StatusCode::BAD_REQUEST, e.to_string())
-                }
-                Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+                Err(e) => json_error(store_error_status(&e), e.to_string()),
             };
             Ok::<_, Rejection>(response)
         })
@@ -104,17 +110,10 @@ fn update_contact(
         .and_then(
             |id: String, input: UpdateContact, store: SharedStore| async move {
                 let mut store = store.lock().await;
-                let response = match store.update_external(&id, input) {
+                let response = match store.update_external(&id, input).await {
                     Ok(contact) => warp::reply::json(&contact).into_response(),
                     Err(StoreError::NotFound) => return Err(warp::reject::not_found()),
-                    Err(StoreError::IdentityReadOnly) => json_error(
-                        StatusCode::FORBIDDEN,
-                        StoreError::IdentityReadOnly.to_string(),
-                    ),
-                    Err(StoreError::Io(e)) if e.kind() == std::io::ErrorKind::InvalidInput => {
-                        json_error(StatusCode::BAD_REQUEST, e.to_string())
-                    }
-                    Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+                    Err(e) => json_error(store_error_status(&e), e.to_string()),
                 };
                 Ok(response)
             },
@@ -130,16 +129,12 @@ fn delete_contact(
         .and(store)
         .and_then(|id: String, store: SharedStore| async move {
             let mut store = store.lock().await;
-            let response = match store.delete_external(&id) {
+            let response = match store.delete_external(&id).await {
                 Ok(()) => {
                     warp::reply::with_status(warp::reply(), StatusCode::NO_CONTENT).into_response()
                 }
                 Err(StoreError::NotFound) => return Err(warp::reject::not_found()),
-                Err(StoreError::IdentityReadOnly) => json_error(
-                    StatusCode::FORBIDDEN,
-                    StoreError::IdentityReadOnly.to_string(),
-                ),
-                Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+                Err(e) => json_error(store_error_status(&e), e.to_string()),
             };
             Ok(response)
         })
@@ -156,9 +151,9 @@ fn sync_contacts(
             match identity::fetch_identity_contacts().await {
                 Ok(identity_contacts) => {
                     let mut store = store.lock().await;
-                    let response = match store.merge_identity(identity_contacts) {
+                    let response = match store.merge_identity(identity_contacts).await {
                         Ok(synced) => warp::reply::json(&SyncResponse { synced }).into_response(),
-                        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+                        Err(e) => json_error(store_error_status(&e), e.to_string()),
                     };
                     Ok::<_, Rejection>(response)
                 }

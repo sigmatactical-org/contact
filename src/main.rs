@@ -7,8 +7,7 @@ fn main() -> Result<(), BoxError> {
         .enable_all()
         .build()?
         .block_on(async move {
-            let store =
-                sigma_contact::store::ContactStore::load(sigma_contact::config::data_path())?;
+            let store = sigma_contact::store::ContactStore::connect().await?;
             let listener = tokio::net::TcpListener::bind(addr).await?;
             println!("Sigma Contact listening on http://{addr}");
             warp::serve(sigma_contact::routes(store))
