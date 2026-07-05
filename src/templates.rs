@@ -1,7 +1,27 @@
 use askama::Template;
 
-use crate::model::Contact;
+use crate::model::{Contact, ContactInquiryForm};
 use sigma_theme::copyright_years;
+
+#[derive(Template)]
+#[template(path = "contact_us.html")]
+struct ContactUsTemplate {
+    return_url: String,
+    display_name: String,
+    email: String,
+    phone: String,
+    message: String,
+    error: Option<String>,
+    identity_base_url: String,
+    copyright_years: String,
+}
+
+#[derive(Template)]
+#[template(path = "contact_us_success.html")]
+struct ContactUsSuccessTemplate {
+    return_url: String,
+    copyright_years: String,
+}
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -36,6 +56,47 @@ fn partition_contacts(contacts: Vec<Contact>) -> (Vec<Contact>, Vec<Contact>) {
         }
     }
     (identity_contacts, external_contacts)
+}
+
+/// # Errors
+///
+/// Returns [`askama::Error`] when template rendering fails.
+pub fn render_contact_us_html(
+    return_url: &str,
+    form: Option<ContactInquiryForm>,
+    error: Option<String>,
+) -> Result<String, askama::Error> {
+    let (display_name, email, phone, message) = match form {
+        Some(form) => (
+            form.display_name,
+            form.email,
+            form.phone,
+            form.message,
+        ),
+        None => (String::new(), String::new(), String::new(), String::new()),
+    };
+    ContactUsTemplate {
+        return_url: return_url.to_string(),
+        display_name,
+        email,
+        phone,
+        message,
+        error,
+        identity_base_url: crate::config::identity_public_base_url(),
+        copyright_years: copyright_years(),
+    }
+    .render()
+}
+
+/// # Errors
+///
+/// Returns [`askama::Error`] when template rendering fails.
+pub fn render_contact_us_success_html(return_url: &str) -> Result<String, askama::Error> {
+    ContactUsSuccessTemplate {
+        return_url: return_url.to_string(),
+        copyright_years: copyright_years(),
+    }
+    .render()
 }
 
 /// # Errors

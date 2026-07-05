@@ -35,3 +35,44 @@ pub fn identity_sync_configured() -> bool {
         && identity_client_id().is_some()
         && identity_client_secret().is_some()
 }
+
+fn normalize_base_url(url: &str) -> String {
+    let mut url = url.trim().to_string();
+    if !url.ends_with('/') {
+        url.push('/');
+    }
+    url
+}
+
+/// Public base URL of the identity BFF (e.g. `http://127.0.0.1:3000/`).
+#[must_use]
+pub fn identity_public_base_url() -> String {
+    std::env::var("CONTACT_IDENTITY_PUBLIC_URL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| normalize_base_url(&s))
+        .unwrap_or_else(|| "http://127.0.0.1:3000/".to_string())
+}
+
+/// Browser origin of the identity BFF for CSP `connect-src` (no trailing slash).
+#[must_use]
+pub fn identity_public_origin() -> String {
+    identity_public_base_url().trim_end_matches('/').to_string()
+}
+
+/// Allowed `return_url` values for the public `/contact` form.
+#[must_use]
+pub fn return_uris() -> Vec<String> {
+    std::env::var("CONTACT_RETURN_URIS")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| {
+            value
+                .split(',')
+                .map(str::trim)
+                .filter(|entry| !entry.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}

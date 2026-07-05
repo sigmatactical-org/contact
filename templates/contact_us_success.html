@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Message sent — Sigma Tactical Group{% endblock %}
+
+{% block main_class %}contact-main contact-us-page{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-7 text-center">
+      <div class="register-success-icon mx-auto mb-3" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      </div>
+      <h1 class="mb-2">Message sent</h1>
+      <p class="text-secondary mb-4">
+        Thanks for reaching out. Sigma Tactical Group will respond using the email address you provided.
+      </p>
+      {% if return_url != "" %}
+      <p class="mb-0">
+        <a class="btn btn-outline-primary" href="{{ return_url }}">Continue</a>
+      </p>
+      {% else %}
+      <p class="text-secondary mb-0">You can close this page.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,9 +1,12 @@
 //! Sigma Contact: identity directory sync and external contact management.
 
+mod allowlist;
 mod api;
 pub mod config;
 mod identity;
 mod model;
+mod public_contact;
+mod session_status;
 pub mod store;
 mod templates;
 mod web;
@@ -45,20 +48,25 @@ pub fn routes(
 
     let store = Arc::new(Mutex::new(store));
 
+    let content_security_policy = {
+        let identity_origin = config::identity_public_origin();
+        format!(
+            "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; \
+             img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; \
+             font-src 'self'; connect-src 'self' {identity_origin}; form-action 'self'"
+        )
+    };
+
     warp::path("up")
         .and(warp::get())
         .map(|| warp::reply::with_status("up", warp::http::StatusCode::OK))
+        .or(public_contact::routes(with_store(store.clone())))
         .or(web::routes(with_store(store.clone())))
         .or(api::routes(with_store(store)))
         .or(sigma_theme::warp::static_files())
         .or(sigma_theme::warp::favicon())
         .recover(sigma_theme::warp::handle_rejection)
-        .with(header(
-            "content-security-policy",
-            "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; \
-             img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; \
-             font-src 'self'; connect-src 'self'; form-action 'self'",
-        ))
+        .with(header("content-security-policy", content_security_policy))
         .with(header("x-content-type-options", "nosniff"))
         .with(header("x-frame-options", "DENY"))
         .with(header("referrer-policy", "strict-origin-when-cross-origin"))
