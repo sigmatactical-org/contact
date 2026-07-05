@@ -8,14 +8,11 @@ pub(crate) struct IdentityStatus {
 }
 
 /// Resolve the signed-in user from the identity BFF using browser session cookies.
-pub(crate) async fn fetch_identity_status(
-    cookie_header: Option<&str>,
-) -> Option<IdentityStatus> {
+pub(crate) async fn fetch_identity_status(cookie_header: Option<&str>) -> Option<IdentityStatus> {
     let cookie_header = cookie_header.filter(|value| !value.trim().is_empty())?;
     let url = format!(
         "{}auth/status",
-        crate::config::identity_public_base_url()
-            .trim_end_matches('/')
+        crate::config::identity_public_base_url().trim_end_matches('/')
     );
 
     let client = reqwest::Client::new();

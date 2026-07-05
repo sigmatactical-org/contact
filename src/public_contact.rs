@@ -19,8 +19,7 @@ fn return_url_allowlist() -> &'static UriAllowlist {
 pub fn routes(
     store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
-    contact_form(store.clone())
-        .or(contact_success())
+    contact_form(store.clone()).or(contact_success())
 }
 
 fn contact_form(
@@ -29,16 +28,14 @@ fn contact_form(
     let path = warp::path("contact").and(warp::path::end());
 
     let get_form = path
-        .clone()
         .and(warp::get())
         .and(warp::query::<ContactQuery>())
         .and_then(|query: ContactQuery| async move {
             if !return_url_is_allowed(&query.return_url) {
-                return Ok(warp::reply::with_status(
-                    "Invalid return_url",
-                    StatusCode::BAD_REQUEST,
-                )
-                .into_response());
+                return Ok(
+                    warp::reply::with_status("Invalid return_url", StatusCode::BAD_REQUEST)
+                        .into_response(),
+                );
             }
             templates::render_contact_us_html(&query.return_url, None, None)
                 .map(|html| warp::reply::html(html).into_response())
@@ -52,9 +49,10 @@ fn contact_form(
         .and(store)
         .and_then(
             |form: ContactInquiryForm, cookie: Option<String>, store: SharedStore| async move {
-            let mut form = form;
-            if let Some(status) = session_status::fetch_identity_status(cookie.as_deref()).await {
-                if status.authenticated {
+                let mut form = form;
+                if let Some(status) = session_status::fetch_identity_status(cookie.as_deref()).await
+                    && status.authenticated
+                {
                     if let Some(display_name) = status.username {
                         form.display_name = display_name;
                     }
@@ -62,74 +60,76 @@ fn contact_form(
                         form.email = email;
                     }
                 }
-            }
 
-            if !return_url_is_allowed(&form.return_url) {
-                return Ok(warp::reply::with_status(
-                    "Invalid return_url",
-                    StatusCode::BAD_REQUEST,
-                )
-                .into_response());
-            }
-            if let Err(message) = form.validate() {
-                let return_url = form.return_url.clone();
-                return templates::render_contact_us_html(&return_url, Some(form), Some(message))
+                if !return_url_is_allowed(&form.return_url) {
+                    return Ok(warp::reply::with_status(
+                        "Invalid return_url",
+                        StatusCode::BAD_REQUEST,
+                    )
+                    .into_response());
+                }
+                if let Err(message) = form.validate() {
+                    let return_url = form.return_url.clone();
+                    return templates::render_contact_us_html(
+                        &return_url,
+                        Some(form),
+                        Some(message),
+                    )
                     .map(|html| {
                         warp::reply::with_status(warp::reply::html(html), StatusCode::BAD_REQUEST)
                             .into_response()
                     })
                     .map_err(|_| warp::reject::not_found());
-            }
-
-            let notes = format!("Website inquiry:\n\n{}", form.message.trim());
-            let input = CreateContact {
-                display_name: form.display_name.trim().to_string(),
-                email: Some(form.email.trim().to_string()),
-                phone: empty_to_none(form.phone.clone()),
-                notes: Some(notes),
-            };
-
-            let mut store = store.lock().await;
-            match store.create_external(input).await {
-                Ok(_) => {
-                    let location: warp::http::Uri = success_location(&form.return_url)
-                        .parse()
-                        .expect("valid redirect location");
-                    Ok(warp::redirect::found(location).into_response())
                 }
-                Err(StoreError::InvalidInput(message)) => {
-                    let return_url = form.return_url.clone();
-                    templates::render_contact_us_html(&return_url, Some(form), Some(message))
-                        .map(|html| {
-                            warp::reply::with_status(
-                                warp::reply::html(html),
-                                StatusCode::BAD_REQUEST,
-                            )
-                            .into_response()
-                        })
-                        .map_err(|_| warp::reject::not_found())
+
+                let notes = format!("Website inquiry:\n\n{}", form.message.trim());
+                let input = CreateContact {
+                    display_name: form.display_name.trim().to_string(),
+                    email: Some(form.email.trim().to_string()),
+                    phone: empty_to_none(form.phone.clone()),
+                    notes: Some(notes),
+                };
+
+                let mut store = store.lock().await;
+                match store.create_external(input).await {
+                    Ok(_) => {
+                        let location: warp::http::Uri = success_location(&form.return_url)
+                            .parse()
+                            .expect("valid redirect location");
+                        Ok(warp::redirect::found(location).into_response())
+                    }
+                    Err(StoreError::InvalidInput(message)) => {
+                        let return_url = form.return_url.clone();
+                        templates::render_contact_us_html(&return_url, Some(form), Some(message))
+                            .map(|html| {
+                                warp::reply::with_status(
+                                    warp::reply::html(html),
+                                    StatusCode::BAD_REQUEST,
+                                )
+                                .into_response()
+                            })
+                            .map_err(|_| warp::reject::not_found())
+                    }
+                    Err(_) => Err(warp::reject::not_found()),
                 }
-                Err(_) => Err(warp::reject::not_found()),
-            }
-        },
+            },
         );
 
     get_form.or(post_form)
 }
 
-fn contact_success(
-) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
+fn contact_success()
+-> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
     warp::path!("contact" / "success")
         .and(warp::path::end())
         .and(warp::get())
         .and(warp::query::<ContactQuery>())
         .and_then(|query: ContactQuery| async move {
             if !query.return_url.is_empty() && !return_url_is_allowed(&query.return_url) {
-                return Ok(warp::reply::with_status(
-                    "Invalid return_url",
-                    StatusCode::BAD_REQUEST,
-                )
-                .into_response());
+                return Ok(
+                    warp::reply::with_status("Invalid return_url", StatusCode::BAD_REQUEST)
+                        .into_response(),
+                );
             }
             templates::render_contact_us_success_html(&query.return_url)
                 .map(|html| warp::reply::html(html).into_response())
@@ -151,10 +151,7 @@ fn success_location(return_url: &str) -> String {
     if return_url.is_empty() {
         return "/contact/success".to_string();
     }
-    format!(
-        "/contact/success?return_url={}",
-        percent_encode(return_url)
-    )
+    format!("/contact/success?return_url={}", percent_encode(return_url))
 }
 
 fn percent_encode(value: &str) -> String {

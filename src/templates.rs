@@ -67,12 +67,7 @@ pub fn render_contact_us_html(
     error: Option<String>,
 ) -> Result<String, askama::Error> {
     let (display_name, email, phone, message) = match form {
-        Some(form) => (
-            form.display_name,
-            form.email,
-            form.phone,
-            form.message,
-        ),
+        Some(form) => (form.display_name, form.email, form.phone, form.message),
         None => (String::new(), String::new(), String::new(), String::new()),
     };
     ContactUsTemplate {
