@@ -45,6 +45,7 @@ pub fn routes(
 ) -> impl Filter<Extract = (impl Reply,), Error = Infallible> + Clone + Send + 'static {
     use warp::reply::with::header;
 
+    let health_pool = Arc::new(store.pool().clone());
     let store = Arc::new(store);
 
     let content_security_policy = {
@@ -59,6 +60,7 @@ pub fn routes(
     warp::path("up")
         .and(warp::get())
         .map(|| warp::reply::with_status("up", warp::http::StatusCode::OK))
+        .or(sigma_pg::health::warp::health_routes("contact", Some(health_pool)))
         .or(public_contact::routes(with_store(store.clone())))
         .or(web::routes(with_store(store.clone())))
         .or(api::routes(with_store(store)))

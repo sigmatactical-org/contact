@@ -42,6 +42,11 @@ impl ContactStore {
         Ok(store)
     }
 
+    #[must_use]
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+
     pub async fn list(&self) -> Result<Vec<Contact>, StoreError> {
         let rows = sqlx::query(
             "SELECT id, source, identity_id, display_name, email, phone, notes, updated_at \
