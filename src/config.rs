@@ -60,6 +60,26 @@ pub fn identity_public_origin() -> String {
     identity_public_base_url().trim_end_matches('/').to_string()
 }
 
+/// Public base URL of this contact service (e.g. `http://127.0.0.1:8083/`).
+#[must_use]
+pub fn public_base_url() -> String {
+    std::env::var("CONTACT_PUBLIC_BASE_URL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| normalize_base_url(&s))
+        .unwrap_or_else(|| "http://127.0.0.1:8083/".to_string())
+}
+
+/// Public base URL of the cart service for navbar links.
+#[must_use]
+pub fn cart_public_base_url() -> String {
+    std::env::var("CONTACT_CART_PUBLIC_URL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| normalize_base_url(&s))
+        .unwrap_or_else(|| "http://127.0.0.1:8084/".to_string())
+}
+
 /// Allowed `return_url` values for the public `/contact` form.
 #[must_use]
 pub fn return_uris() -> Vec<String> {

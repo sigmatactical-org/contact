@@ -1,11 +1,26 @@
 use askama::Template;
 
 use crate::model::{Contact, ContactInquiryForm};
+use sigma_identity_nav::render_app_site_nav;
 use sigma_theme::copyright_years;
+
+fn site_nav(return_path: &str, show_contact_us: bool) -> Result<String, askama::Error> {
+    render_app_site_nav(
+        &crate::config::identity_public_base_url(),
+        &crate::config::public_base_url(),
+        &crate::config::public_base_url(),
+        &crate::config::cart_public_base_url(),
+        0,
+        return_path,
+        show_contact_us,
+        "",
+    )
+}
 
 #[derive(Template)]
 #[template(path = "contact_us.html")]
 struct ContactUsTemplate {
+    site_nav: String,
     return_url: String,
     display_name: String,
     email: String,
@@ -19,6 +34,7 @@ struct ContactUsTemplate {
 #[derive(Template)]
 #[template(path = "contact_us_success.html")]
 struct ContactUsSuccessTemplate {
+    site_nav: String,
     return_url: String,
     copyright_years: String,
 }
@@ -26,6 +42,7 @@ struct ContactUsSuccessTemplate {
 #[derive(Template)]
 #[template(path = "index.html")]
 struct IndexTemplate {
+    site_nav: String,
     identity_contacts: Vec<Contact>,
     external_contacts: Vec<Contact>,
     identity_sync_configured: bool,
@@ -36,6 +53,7 @@ struct IndexTemplate {
 #[derive(Template)]
 #[template(path = "form.html")]
 struct FormTemplate {
+    site_nav: String,
     contact: Option<Contact>,
     display_name: String,
     email: String,
@@ -71,6 +89,7 @@ pub fn render_contact_us_html(
         None => (String::new(), String::new(), String::new(), String::new()),
     };
     ContactUsTemplate {
+        site_nav: site_nav("/contact", false)?,
         return_url: return_url.to_string(),
         display_name,
         email,
@@ -88,6 +107,7 @@ pub fn render_contact_us_html(
 /// Returns [`askama::Error`] when template rendering fails.
 pub fn render_contact_us_success_html(return_url: &str) -> Result<String, askama::Error> {
     ContactUsSuccessTemplate {
+        site_nav: site_nav("/contact/success", true)?,
         return_url: return_url.to_string(),
         copyright_years: copyright_years(),
     }
@@ -104,6 +124,7 @@ pub fn render_index_html(
 ) -> Result<String, askama::Error> {
     let (identity_contacts, external_contacts) = partition_contacts(contacts);
     IndexTemplate {
+        site_nav: site_nav("/", true)?,
         identity_contacts,
         external_contacts,
         identity_sync_configured,
@@ -132,7 +153,12 @@ pub fn render_form_html(
         ),
         None => (String::new(), String::new(), String::new(), String::new()),
     };
+    let return_path = contact
+        .as_ref()
+        .map(|entry| format!("/contacts/{}/edit", entry.id))
+        .unwrap_or_else(|| "/contacts/new".to_string());
     FormTemplate {
+        site_nav: site_nav(&return_path, true)?,
         contact,
         display_name,
         email,
