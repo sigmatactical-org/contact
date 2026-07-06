@@ -1,20 +1,20 @@
 use askama::Template;
 
 use crate::model::{Contact, ContactInquiryForm};
-use sigma_identity_nav::render_app_site_nav;
+use sigma_identity_nav::{AppSiteNav, render_app_site_nav};
 use sigma_theme::copyright_years;
 
 fn site_nav(return_path: &str, show_contact_us: bool) -> Result<String, askama::Error> {
-    render_app_site_nav(
-        &crate::config::identity_public_base_url(),
-        &crate::config::public_base_url(),
-        &crate::config::public_base_url(),
-        &crate::config::cart_public_base_url(),
-        0,
+    render_app_site_nav(&AppSiteNav {
+        identity_base: &crate::config::identity_public_base_url(),
+        app_base: &crate::config::public_base_url(),
+        contact_base: &crate::config::public_base_url(),
+        cart_url: &crate::config::cart_public_base_url(),
+        cart_count: 0,
         return_path,
         show_contact_us,
-        "",
-    )
+        leading_html: "",
+    })
 }
 
 #[derive(Template)]
