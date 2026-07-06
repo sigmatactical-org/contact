@@ -72,7 +72,11 @@ fn get_contact(
         .and(store)
         .and_then(|id: String, store: SharedStore| async move {
             let store = store.lock().await;
-            match store.get(&id).await.map_err(|_| warp::reject::not_found())? {
+            match store
+                .get(&id)
+                .await
+                .map_err(|_| warp::reject::not_found())?
+            {
                 Some(contact) => Ok(warp::reply::json(&contact)),
                 None => Err(warp::reject::not_found()),
             }

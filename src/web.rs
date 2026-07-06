@@ -30,13 +30,9 @@ fn index_page(
         .and_then(|store: SharedStore| async move {
             let store = store.lock().await;
             let contacts = store.list().await.map_err(|_| warp::reject::not_found())?;
-            templates::render_index_html(
-                contacts,
-                crate::config::identity_sync_configured(),
-                None,
-            )
-            .map(warp::reply::html)
-            .map_err(|_| warp::reject::not_found())
+            templates::render_index_html(contacts, crate::config::identity_sync_configured(), None)
+                .map(warp::reply::html)
+                .map_err(|_| warp::reject::not_found())
         })
 }
 
@@ -84,10 +80,11 @@ fn create_contact_form(
                         Some("Display name is required.".to_string()),
                         crate::config::identity_sync_configured(),
                     ) {
-                        Ok(html) => {
-                            warp::reply::with_status(warp::reply::html(html), StatusCode::BAD_REQUEST)
-                                .into_response()
-                        }
+                        Ok(html) => warp::reply::with_status(
+                            warp::reply::html(html),
+                            StatusCode::BAD_REQUEST,
+                        )
+                        .into_response(),
                         Err(_) => return Err(warp::reject::not_found()),
                     }
                 }
@@ -105,7 +102,11 @@ fn edit_contact_page(
         .and(store)
         .and_then(|id: String, store: SharedStore| async move {
             let store = store.lock().await;
-            let Some(contact) = store.get(&id).await.map_err(|_| warp::reject::not_found())? else {
+            let Some(contact) = store
+                .get(&id)
+                .await
+                .map_err(|_| warp::reject::not_found())?
+            else {
                 return Err(warp::reject::not_found());
             };
             if contact.source != ContactSource::External {
