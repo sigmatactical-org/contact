@@ -59,11 +59,10 @@ Standalone clone:
 cargo run -p sigma-contact
 ```
 
-Under the sigma workspace (`sigma/commerce/contact`):
+Under the sigma workspace (`sigma/it/contact`):
 
 ```bash
-cd sigma/commerce/contact && ./scripts/prepare-local.sh && cargo run -p sigma-contact
-# or: (cd sigma/commerce && ./scripts/prepare-local.sh && cargo run -p sigma-contact)
+cd sigma/it/contact && ./scripts/prepare-local.sh && cargo run -p sigma-contact
 ```
 
 Open http://localhost:8080
