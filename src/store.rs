@@ -29,7 +29,7 @@ pub struct ContactStore {
 
 impl ContactStore {
     pub async fn connect() -> Result<Self, StoreError> {
-        let pool = sigma_pg::connect().await?;
+        let pool = sigma_pg::connect_as("contact").await?;
         Ok(Self { pool })
     }
 
@@ -63,7 +63,7 @@ impl ContactStore {
         row.map(row_to_contact).transpose()
     }
 
-    pub async fn create_external(&mut self, input: CreateContact) -> Result<Contact, StoreError> {
+    pub async fn create_external(&self, input: CreateContact) -> Result<Contact, StoreError> {
         if input.display_name.trim().is_empty() {
             return Err(StoreError::InvalidInput(
                 "display_name is required".to_string(),
@@ -75,7 +75,7 @@ impl ContactStore {
     }
 
     pub async fn update_external(
-        &mut self,
+        &self,
         id: &str,
         input: UpdateContact,
     ) -> Result<Contact, StoreError> {
@@ -104,7 +104,7 @@ impl ContactStore {
         Ok(contact)
     }
 
-    pub async fn delete_external(&mut self, id: &str) -> Result<(), StoreError> {
+    pub async fn delete_external(&self, id: &str) -> Result<(), StoreError> {
         let contact = self.get(id).await?.ok_or(StoreError::NotFound)?;
         if contact.source != ContactSource::External {
             return Err(StoreError::IdentityReadOnly);
@@ -117,7 +117,7 @@ impl ContactStore {
     }
 
     pub async fn merge_identity(
-        &mut self,
+        &self,
         identity_contacts: Vec<Contact>,
     ) -> Result<usize, StoreError> {
         let count = identity_contacts.len();

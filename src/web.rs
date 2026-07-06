@@ -28,7 +28,6 @@ fn index_page(
         .and(warp::get())
         .and(store)
         .and_then(|store: SharedStore| async move {
-            let store = store.lock().await;
             let contacts = store.list().await.map_err(|_| warp::reject::not_found())?;
             templates::render_index_html(contacts, crate::config::identity_sync_configured(), None)
                 .map(warp::reply::html)
@@ -45,7 +44,6 @@ fn new_contact_page(
         .and(warp::get())
         .and(store)
         .and_then(|store: SharedStore| async move {
-            let store = store.lock().await;
             let contacts = store.list().await.map_err(|_| warp::reject::not_found())?;
             templates::render_form_html(
                 contacts,
@@ -67,7 +65,6 @@ fn create_contact_form(
         .and(warp::body::form())
         .and(store)
         .and_then(|form: ContactForm, store: SharedStore| async move {
-            let mut store = store.lock().await;
             let response = match store.create_external(form.into_create()).await {
                 Ok(_) => {
                     warp::redirect::redirect(warp::http::Uri::from_static("/")).into_response()
@@ -101,7 +98,6 @@ fn edit_contact_page(
         .and(warp::get())
         .and(store)
         .and_then(|id: String, store: SharedStore| async move {
-            let store = store.lock().await;
             let Some(contact) = store
                 .get(&id)
                 .await
@@ -133,7 +129,6 @@ fn update_contact_form(
         .and(store)
         .and_then(
             |id: String, form: ContactForm, store: SharedStore| async move {
-                let mut store = store.lock().await;
                 let response = match store.update_external(&id, form.into_update()).await {
                     Ok(_) => {
                         warp::redirect::redirect(warp::http::Uri::from_static("/")).into_response()
@@ -171,7 +166,6 @@ fn delete_contact_form(
         .and(warp::post())
         .and(store)
         .and_then(|id: String, store: SharedStore| async move {
-            let mut store = store.lock().await;
             match store.delete_external(&id).await {
                 Ok(()) => Ok(warp::redirect::redirect(warp::http::Uri::from_static("/"))),
                 Err(StoreError::NotFound) | Err(StoreError::IdentityReadOnly) => {
@@ -192,7 +186,6 @@ fn sync_contacts_form(
         .and(store)
         .and_then(|store: SharedStore| async move {
             let sync_result = identity::fetch_identity_contacts().await;
-            let mut store = store.lock().await;
             let message = match sync_result {
                 Ok(identity_contacts) => match store.merge_identity(identity_contacts).await {
                     Ok(count) => Some(format!("Synced {count} identity contact(s).")),

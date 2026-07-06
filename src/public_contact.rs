@@ -90,7 +90,6 @@ fn contact_form(
                     notes: Some(notes),
                 };
 
-                let mut store = store.lock().await;
                 match store.create_external(input).await {
                     Ok(_) => {
                         let location: warp::http::Uri = success_location(&form.return_url)

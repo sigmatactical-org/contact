@@ -14,14 +14,13 @@ mod web;
 use std::convert::Infallible;
 use std::sync::Arc;
 
-use tokio::sync::Mutex;
 use warp::Filter;
 use warp::Reply;
 
 pub use model::{Contact, ContactSource, CreateContact, UpdateContact};
 
-/// Shared mutable contact store handle.
-pub type SharedStore = Arc<Mutex<store::ContactStore>>;
+/// Shared contact store handle (`PgPool` is internally concurrent).
+pub type SharedStore = Arc<store::ContactStore>;
 
 /// Resolve listen address from **`PORT`** (default **8080**).
 #[must_use]
@@ -46,7 +45,7 @@ pub fn routes(
 ) -> impl Filter<Extract = (impl Reply,), Error = Infallible> + Clone + Send + 'static {
     use warp::reply::with::header;
 
-    let store = Arc::new(Mutex::new(store));
+    let store = Arc::new(store);
 
     let content_security_policy = {
         let identity_origin = config::identity_public_origin();
