@@ -57,7 +57,8 @@ fn list_contacts(
         .and(warp::get())
         .and(store)
         .and_then(|store: SharedStore| async move {
-            let contacts = store.lock().await.list();
+            let store = store.lock().await;
+            let contacts = store.list().await.map_err(|_| warp::reject::not_found())?;
             Ok::<_, Rejection>(warp::reply::json(&contacts))
         })
 }
@@ -71,7 +72,7 @@ fn get_contact(
         .and(store)
         .and_then(|id: String, store: SharedStore| async move {
             let store = store.lock().await;
-            match store.get(&id) {
+            match store.get(&id).await.map_err(|_| warp::reject::not_found())? {
                 Some(contact) => Ok(warp::reply::json(&contact)),
                 None => Err(warp::reject::not_found()),
             }

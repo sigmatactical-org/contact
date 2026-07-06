@@ -25,7 +25,7 @@ Shared site chrome comes from [sigma-theme](https://github.com/sigmatactical-org
 | `CONTACT_IDENTITY_CLIENT_ID` | Service-account client id for Admin API |
 | `CONTACT_IDENTITY_CLIENT_SECRET` | Service-account client secret |
 
-Identity sync requires a Keycloak client with **service accounts enabled** and the **view-users** role on **realm-management**. In the dev realm, you can reuse the `identity` client credentials and assign that role to `service-account-identity`.
+Identity sync requires a Keycloak client with **service accounts enabled** and the **view-users** role on **realm-management**. In the dev realm, run `platform/scripts/seed-keycloak-dev-users.sh` to grant `view-users` on `service-account-identity`.
 
 ## API
 
@@ -87,7 +87,7 @@ Release is in **`.github/workflows/release.yml`** when configured. Locally:
 docker build -f Dockerfile build/image
 ```
 
-Data is stored in the shared PostgreSQL `contact` schema (`contact.document` JSONB table). Postgres runs in the [platform](https://github.com/sigmatactical-org/platform) kind stack — port-forward for local `cargo run`:
+Data is stored in the shared PostgreSQL `contact` schema (`contact.contacts` JSONB table). Postgres runs in the [platform](https://github.com/sigmatactical-org/platform) kind stack — port-forward for local `cargo run`:
 
 ```bash
 cd platform && ./scripts/postgres-dev.sh port-forward-bg && ./scripts/postgres-dev.sh migrate

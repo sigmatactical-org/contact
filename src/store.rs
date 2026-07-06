@@ -1,9 +1,8 @@
-use sqlx::PgPool;
+use chrono::{DateTime, Utc};
+use sqlx::{PgPool, Row};
 use thiserror::Error;
 
 use crate::model::{Contact, ContactSource, CreateContact, UpdateContact};
-
-const SCHEMA: &str = "contact";
 
 #[derive(Debug, Error)]
 pub enum StoreError {
@@ -17,53 +16,51 @@ pub enum StoreError {
     InvalidInput(String),
 }
 
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-struct Database {
-    contacts: Vec<Contact>,
+impl From<sqlx::Error> for StoreError {
+    fn from(err: sqlx::Error) -> Self {
+        Self::Database(err.into())
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct ContactStore {
     pool: PgPool,
-    db: Database,
 }
 
 impl ContactStore {
-    /// Connect to PostgreSQL and load the contact snapshot.
     pub async fn connect() -> Result<Self, StoreError> {
         let pool = sigma_pg::connect().await?;
-        let db: Database = sigma_pg::load_document(&pool, SCHEMA).await?;
-        Ok(Self { pool, db })
+        Ok(Self { pool })
     }
 
-    /// Reset the contact snapshot (tests only).
     #[cfg(test)]
     pub async fn connect_empty() -> Result<Self, StoreError> {
-        let pool = sigma_pg::connect().await?;
-        let db = Database::default();
-        sigma_pg::save_document(&pool, SCHEMA, &db).await?;
-        Ok(Self { pool, db })
+        let store = Self::connect().await?;
+        sqlx::query("TRUNCATE contact.contacts")
+            .execute(&store.pool)
+            .await?;
+        Ok(store)
     }
 
-    async fn persist(&self) -> Result<(), StoreError> {
-        sigma_pg::save_document(&self.pool, SCHEMA, &self.db).await?;
-        Ok(())
+    pub async fn list(&self) -> Result<Vec<Contact>, StoreError> {
+        let rows = sqlx::query(
+            "SELECT id, source, identity_id, display_name, email, phone, notes, updated_at \
+             FROM contact.contacts ORDER BY lower(display_name)",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter().map(row_to_contact).collect()
     }
 
-    #[must_use]
-    pub fn list(&self) -> Vec<Contact> {
-        let mut contacts = self.db.contacts.clone();
-        contacts.sort_by(|a, b| {
-            a.display_name
-                .to_lowercase()
-                .cmp(&b.display_name.to_lowercase())
-        });
-        contacts
-    }
-
-    #[must_use]
-    pub fn get(&self, id: &str) -> Option<Contact> {
-        self.db.contacts.iter().find(|c| c.id == id).cloned()
+    pub async fn get(&self, id: &str) -> Result<Option<Contact>, StoreError> {
+        let row = sqlx::query(
+            "SELECT id, source, identity_id, display_name, email, phone, notes, updated_at \
+             FROM contact.contacts WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+        row.map(row_to_contact).transpose()
     }
 
     pub async fn create_external(&mut self, input: CreateContact) -> Result<Contact, StoreError> {
@@ -73,8 +70,7 @@ impl ContactStore {
             ));
         }
         let contact = Contact::new_external(input);
-        self.db.contacts.push(contact.clone());
-        self.persist().await?;
+        insert_contact(&self.pool, &contact).await?;
         Ok(contact)
     }
 
@@ -83,12 +79,7 @@ impl ContactStore {
         id: &str,
         input: UpdateContact,
     ) -> Result<Contact, StoreError> {
-        let contact = self
-            .db
-            .contacts
-            .iter_mut()
-            .find(|c| c.id == id)
-            .ok_or(StoreError::NotFound)?;
+        let mut contact = self.get(id).await?.ok_or(StoreError::NotFound)?;
         if contact.source != ContactSource::External {
             return Err(StoreError::IdentityReadOnly);
         }
@@ -98,37 +89,121 @@ impl ContactStore {
             ));
         }
         contact.apply_update(input);
-        let updated = contact.clone();
-        self.persist().await?;
-        Ok(updated)
+        sqlx::query(
+            "UPDATE contact.contacts SET display_name = $2, email = $3, phone = $4, notes = $5, \
+             updated_at = $6 WHERE id = $1",
+        )
+        .bind(&contact.id)
+        .bind(&contact.display_name)
+        .bind(&contact.email)
+        .bind(&contact.phone)
+        .bind(&contact.notes)
+        .bind(parse_ts(&contact.updated_at)?)
+        .execute(&self.pool)
+        .await?;
+        Ok(contact)
     }
 
     pub async fn delete_external(&mut self, id: &str) -> Result<(), StoreError> {
-        let index = self
-            .db
-            .contacts
-            .iter()
-            .position(|c| c.id == id)
-            .ok_or(StoreError::NotFound)?;
-        if self.db.contacts[index].source != ContactSource::External {
+        let contact = self.get(id).await?.ok_or(StoreError::NotFound)?;
+        if contact.source != ContactSource::External {
             return Err(StoreError::IdentityReadOnly);
         }
-        self.db.contacts.remove(index);
-        self.persist().await
+        sqlx::query("DELETE FROM contact.contacts WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
     }
 
-    /// Merge identity-sourced contacts; external entries are preserved.
     pub async fn merge_identity(
         &mut self,
         identity_contacts: Vec<Contact>,
     ) -> Result<usize, StoreError> {
-        self.db
-            .contacts
-            .retain(|c| c.source != ContactSource::Identity);
-
         let count = identity_contacts.len();
-        self.db.contacts.extend(identity_contacts);
-        self.persist().await?;
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("DELETE FROM contact.contacts WHERE source = 'identity'")
+            .execute(&mut *tx)
+            .await?;
+        for contact in identity_contacts {
+            insert_contact_tx(&mut tx, &contact).await?;
+        }
+        tx.commit().await?;
         Ok(count)
     }
+}
+
+async fn insert_contact(pool: &PgPool, contact: &Contact) -> Result<(), StoreError> {
+    sqlx::query(
+        "INSERT INTO contact.contacts \
+         (id, source, identity_id, display_name, email, phone, notes, updated_at) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+    )
+    .bind(&contact.id)
+    .bind(source_str(contact.source))
+    .bind(&contact.identity_id)
+    .bind(&contact.display_name)
+    .bind(&contact.email)
+    .bind(&contact.phone)
+    .bind(&contact.notes)
+    .bind(parse_ts(&contact.updated_at)?)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+async fn insert_contact_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    contact: &Contact,
+) -> Result<(), StoreError> {
+    sqlx::query(
+        "INSERT INTO contact.contacts \
+         (id, source, identity_id, display_name, email, phone, notes, updated_at) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+    )
+    .bind(&contact.id)
+    .bind(source_str(contact.source))
+    .bind(&contact.identity_id)
+    .bind(&contact.display_name)
+    .bind(&contact.email)
+    .bind(&contact.phone)
+    .bind(&contact.notes)
+    .bind(parse_ts(&contact.updated_at)?)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+fn row_to_contact(row: sqlx::postgres::PgRow) -> Result<Contact, StoreError> {
+    let source_str: String = row.get("source");
+    Ok(Contact {
+        id: row.get("id"),
+        source: parse_source(&source_str),
+        identity_id: row.get("identity_id"),
+        display_name: row.get("display_name"),
+        email: row.get("email"),
+        phone: row.get("phone"),
+        notes: row.get("notes"),
+        updated_at: row.get::<DateTime<Utc>, _>("updated_at").to_rfc3339(),
+    })
+}
+
+fn source_str(source: ContactSource) -> &'static str {
+    match source {
+        ContactSource::Identity => "identity",
+        ContactSource::External => "external",
+    }
+}
+
+fn parse_source(value: &str) -> ContactSource {
+    match value {
+        "identity" => ContactSource::Identity,
+        _ => ContactSource::External,
+    }
+}
+
+fn parse_ts(value: &str) -> Result<DateTime<Utc>, StoreError> {
+    value
+        .parse::<DateTime<Utc>>()
+        .map_err(|e| StoreError::InvalidInput(format!("invalid timestamp: {e}")))
 }
