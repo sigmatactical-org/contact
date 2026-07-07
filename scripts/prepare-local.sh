@@ -23,6 +23,7 @@ if [[ -n "$THEME_HELPER" ]]; then
   write_sigma_pg_patch "$ROOT"
   write_identity_nav_patch "$ROOT"
   write_cart_nav_patch "$ROOT"
+  write_contact_nav_patch "$ROOT"
   write_askama_config "$ROOT"
   build_theme_ts "$ROOT"
 else
