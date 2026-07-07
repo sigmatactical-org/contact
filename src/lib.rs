@@ -3,6 +3,7 @@
 mod allowlist;
 mod api;
 pub mod config;
+mod human_check;
 mod identity;
 mod model;
 mod public_contact;
@@ -57,6 +58,8 @@ pub fn routes(
         )
     };
 
+    let human_check = sigma_human_check::HumanCheck::from_env();
+
     warp::path("up")
         .and(warp::get())
         .map(|| warp::reply::with_status("up", warp::http::StatusCode::OK))
@@ -64,7 +67,11 @@ pub fn routes(
             "contact",
             Some(health_pool),
         ))
-        .or(public_contact::routes(with_store(store.clone())))
+        .or(human_check::routes(human_check.clone()))
+        .or(public_contact::routes(
+            with_store(store.clone()),
+            human_check,
+        ))
         .or(web::routes(with_store(store.clone())))
         .or(api::routes(with_store(store)))
         .or(sigma_theme::warp::static_files())

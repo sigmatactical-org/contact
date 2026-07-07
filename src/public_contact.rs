@@ -5,6 +5,7 @@ use warp::{Filter, Rejection, Reply};
 
 use crate::SharedStore;
 use crate::allowlist::UriAllowlist;
+use crate::human_check;
 use crate::model::{ContactInquiryForm, CreateContact};
 use crate::session_status;
 use crate::store::StoreError;
@@ -18,26 +19,29 @@ fn return_url_allowlist() -> &'static UriAllowlist {
 
 pub fn routes(
     store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
+    human_check: sigma_human_check::HumanCheck,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
-    contact_form(store.clone()).or(contact_success())
+    contact_form(store.clone(), human_check.clone()).or(contact_success())
 }
 
 fn contact_form(
     store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
+    human_check: sigma_human_check::HumanCheck,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
     let path = warp::path("contact").and(warp::path::end());
 
     let get_form = path
         .and(warp::get())
         .and(warp::query::<ContactQuery>())
-        .and_then(|query: ContactQuery| async move {
+        .and(human_check::with_check(human_check.clone()))
+        .and_then(|query: ContactQuery, human_check: sigma_human_check::HumanCheck| async move {
             if !return_url_is_allowed(&query.return_url) {
                 return Ok(
                     warp::reply::with_status("Invalid return_url", StatusCode::BAD_REQUEST)
                         .into_response(),
                 );
             }
-            templates::render_contact_us_html(&query.return_url, None, None)
+            templates::render_contact_us_html(&query.return_url, None, None, &human_check)
                 .map(|html| warp::reply::html(html).into_response())
                 .map_err(|_| warp::reject::not_found())
         });
@@ -47,8 +51,12 @@ fn contact_form(
         .and(warp::body::form())
         .and(warp::header::optional::<String>("cookie"))
         .and(store)
+        .and(human_check::with_check(human_check))
         .and_then(
-            |form: ContactInquiryForm, cookie: Option<String>, store: SharedStore| async move {
+            |form: ContactInquiryForm,
+             cookie: Option<String>,
+             store: SharedStore,
+             human_check: sigma_human_check::HumanCheck| async move {
                 let mut form = form;
                 if let Some(status) = session_status::fetch_identity_status(cookie.as_deref()).await
                     && status.authenticated
@@ -74,6 +82,22 @@ fn contact_form(
                         &return_url,
                         Some(form),
                         Some(message),
+                        &human_check,
+                    )
+                    .map(|html| {
+                        warp::reply::with_status(warp::reply::html(html), StatusCode::BAD_REQUEST)
+                            .into_response()
+                    })
+                    .map_err(|_| warp::reject::not_found());
+                }
+
+                if let Err(err) = human_check::verify_field(&human_check, &form.altcha) {
+                    let return_url = form.return_url.clone();
+                    return templates::render_contact_us_html(
+                        &return_url,
+                        Some(form),
+                        Some(human_check::rejection_message(&err)),
+                        &human_check,
                     )
                     .map(|html| {
                         warp::reply::with_status(warp::reply::html(html), StatusCode::BAD_REQUEST)
@@ -99,7 +123,7 @@ fn contact_form(
                     }
                     Err(StoreError::InvalidInput(message)) => {
                         let return_url = form.return_url.clone();
-                        templates::render_contact_us_html(&return_url, Some(form), Some(message))
+                        templates::render_contact_us_html(&return_url, Some(form), Some(message), &human_check)
                             .map(|html| {
                                 warp::reply::with_status(
                                     warp::reply::html(html),

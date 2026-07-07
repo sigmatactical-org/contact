@@ -55,6 +55,8 @@ pub struct ContactInquiryForm {
     pub email: String,
     pub phone: String,
     pub message: String,
+    #[serde(default)]
+    pub altcha: String,
 }
 
 impl ContactInquiryForm {

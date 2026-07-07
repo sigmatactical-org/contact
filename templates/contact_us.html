@@ -2,11 +2,6 @@
 
 {% block title %}Contact us — Sigma Tactical Group{% endblock %}
 
-{% block brand %}Sigma Contact{% endblock %}
-
-{% block nav_actions %}
-{{ site_nav|safe }}
-{% endblock %}
 
 {% block main_class %}contact-main contact-us-page{% endblock %}
 
@@ -48,6 +43,7 @@
             <label for="message" class="form-label">Message</label>
             <textarea class="form-control" id="message" name="message" rows="5" required>{{ message }}</textarea>
           </div>
+          {% include "widgets/human_check.html" %}
           <div class="d-flex flex-wrap gap-2">
             <button type="submit" class="btn btn-primary">Send message</button>
             {% if return_url != "" %}
@@ -59,5 +55,8 @@
     </div>
   </div>
 </div>
+{% if human_check_enabled %}
+<script type="module" src="/static/vendor/altcha/altcha.js"></script>
+{% endif %}
 <script type="module" src="/static/js/contact-form-auth.js"></script>
 {% endblock %}
