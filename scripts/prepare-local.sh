@@ -24,6 +24,7 @@ if [[ -n "$THEME_HELPER" ]]; then
   write_identity_nav_patch "$ROOT"
   write_cart_nav_patch "$ROOT"
   write_contact_nav_patch "$ROOT"
+  write_human_check_patch "$ROOT"
   write_askama_config "$ROOT"
   build_theme_ts "$ROOT"
 else
@@ -44,6 +45,13 @@ EOF
 [general]
 dirs = ["templates", "$THEME_PATH/assets/templates"]
 EOF
+  if [[ -f human-check/Cargo.toml ]]; then
+    cat >>.cargo/config.toml <<EOF
+
+[patch."https://github.com/sigmatactical-org/human-check.git"]
+sigma-human-check = { path = "human-check" }
+EOF
+  fi
   if [[ -f ../Cargo.toml ]] && grep -q 'members' ../Cargo.toml 2>/dev/null; then
     mkdir -p ../.cargo
     cat >../.cargo/config.toml <<EOF
