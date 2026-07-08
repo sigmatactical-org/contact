@@ -87,18 +87,12 @@ mod tests {
             "/products/SIGMA-RACER",
         );
         assert!(url.contains("/contact?return_url="));
-        assert!(url.contains(
-            "return_url=http%3A%2F%2Fstore.example%2Fproducts%2FSIGMA-RACER"
-        ));
+        assert!(url.contains("return_url=http%3A%2F%2Fstore.example%2Fproducts%2FSIGMA-RACER"));
     }
 
     #[test]
     fn root_return_path_keeps_trailing_slash() {
-        let url = contact_us_url(
-            "http://contact.example",
-            "http://store.example",
-            "/",
-        );
+        let url = contact_us_url("http://contact.example", "http://store.example", "/");
         assert!(url.contains("return_url=http%3A%2F%2Fstore.example%2F"));
     }
 

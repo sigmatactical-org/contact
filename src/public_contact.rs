@@ -34,17 +34,20 @@ fn contact_form(
         .and(warp::get())
         .and(warp::query::<ContactQuery>())
         .and(human_check::with_check(human_check.clone()))
-        .and_then(|query: ContactQuery, human_check: sigma_human_check::HumanCheck| async move {
-            if !return_url_is_allowed(&query.return_url) {
-                return Ok(
-                    warp::reply::with_status("Invalid return_url", StatusCode::BAD_REQUEST)
-                        .into_response(),
-                );
-            }
-            templates::render_contact_us_html(&query.return_url, None, None, &human_check)
-                .map(|html| warp::reply::html(html).into_response())
-                .map_err(|_| warp::reject::not_found())
-        });
+        .and_then(
+            |query: ContactQuery, human_check: sigma_human_check::HumanCheck| async move {
+                if !return_url_is_allowed(&query.return_url) {
+                    return Ok(warp::reply::with_status(
+                        "Invalid return_url",
+                        StatusCode::BAD_REQUEST,
+                    )
+                    .into_response());
+                }
+                templates::render_contact_us_html(&query.return_url, None, None, &human_check)
+                    .map(|html| warp::reply::html(html).into_response())
+                    .map_err(|_| warp::reject::not_found())
+            },
+        );
 
     let post_form = path
         .and(warp::post())
@@ -123,15 +126,20 @@ fn contact_form(
                     }
                     Err(StoreError::InvalidInput(message)) => {
                         let return_url = form.return_url.clone();
-                        templates::render_contact_us_html(&return_url, Some(form), Some(message), &human_check)
-                            .map(|html| {
-                                warp::reply::with_status(
-                                    warp::reply::html(html),
-                                    StatusCode::BAD_REQUEST,
-                                )
-                                .into_response()
-                            })
-                            .map_err(|_| warp::reject::not_found())
+                        templates::render_contact_us_html(
+                            &return_url,
+                            Some(form),
+                            Some(message),
+                            &human_check,
+                        )
+                        .map(|html| {
+                            warp::reply::with_status(
+                                warp::reply::html(html),
+                                StatusCode::BAD_REQUEST,
+                            )
+                            .into_response()
+                        })
+                        .map_err(|_| warp::reject::not_found())
                     }
                     Err(_) => Err(warp::reject::not_found()),
                 }

@@ -16,9 +16,7 @@ pub fn rejection_message(error: &HumanCheckError) -> String {
         HumanCheckError::Rejected | HumanCheckError::Altcha(_) | HumanCheckError::Json(_) => {
             "Human verification failed. Please try again.".into()
         }
-        HumanCheckError::Config(_) => {
-            "Human verification is temporarily unavailable.".into()
-        }
+        HumanCheckError::Config(_) => "Human verification is temporarily unavailable.".into(),
     }
 }
 
@@ -35,7 +33,9 @@ pub fn routes(
         .and(with_check(check))
         .and_then(|check: HumanCheck| async move {
             if !check.is_enabled() {
-                return Ok(warp::reply::with_status("disabled", StatusCode::NOT_FOUND).into_response());
+                return Ok(
+                    warp::reply::with_status("disabled", StatusCode::NOT_FOUND).into_response()
+                );
             }
             let response: warp::reply::Response = match check.issue_challenge() {
                 Ok(challenge) => match serde_json::to_string(&challenge) {
