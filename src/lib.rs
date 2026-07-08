@@ -85,6 +85,7 @@ mod tests {
     use warp::http::StatusCode;
 
     async fn test_store() -> store::ContactStore {
+        sigma_pg::clients::internal::ensure_test_internal_token();
         store::ContactStore::connect_empty()
             .await
             .expect("PostgreSQL required for tests")
@@ -118,6 +119,10 @@ mod tests {
             .method("GET")
             .path("/contacts")
             .header("accept", "application/json")
+            .header(
+                "x-sigma-internal-token",
+                sigma_pg::clients::internal::TEST_INTERNAL_TOKEN,
+            )
             .reply(&routes(test_store().await))
             .await;
         assert_eq!(res.status(), StatusCode::OK);
@@ -131,6 +136,7 @@ mod tests {
             .method("POST")
             .path("/contacts")
             .header("content-type", "application/json")
+            .header("x-sigma-internal-token", sigma_pg::clients::internal::TEST_INTERNAL_TOKEN)
             .body(
                 r#"{"display_name":"Ada Lovelace","email":"ada@example.com","phone":null,"notes":null}"#,
             )
