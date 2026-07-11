@@ -3,12 +3,15 @@ members = [".", "nav"]
 resolver = "2"
 
 [package]
+
+
 name = "sigma-contact"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.90.0"
 license = "MIT OR Apache-2.0"
 authors = ["Sigma Tactical Group contributors <https://github.com/sigmatactical-org>"]
+homepage = "https://sigmatactical.org"
 description = "Contact directory for Sigma Tactical Group — identity users and external contacts"
 publish = false
 
