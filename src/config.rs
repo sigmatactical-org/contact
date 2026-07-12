@@ -60,6 +60,20 @@ pub fn identity_public_origin() -> String {
     identity_public_base_url().trim_end_matches('/').to_string()
 }
 
+/// Base URL for server-to-server calls to the identity BFF (e.g. session
+/// status checks on contact form submit). Must be reachable from this pod,
+/// unlike `identity_public_base_url`, which is the browser-facing ingress
+/// host and does not resolve back to identity from inside the cluster
+/// network. Falls back to the public URL for non-cluster local dev.
+#[must_use]
+pub fn identity_internal_base_url() -> String {
+    std::env::var("CONTACT_IDENTITY_INTERNAL_URL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| normalize_base_url(&s))
+        .unwrap_or_else(identity_public_base_url)
+}
+
 /// Public base URL of this contact service (e.g. `http://127.0.0.1:8083/`).
 #[must_use]
 pub fn public_base_url() -> String {
