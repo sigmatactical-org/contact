@@ -1,43 +1,14 @@
-use thiserror::Error;
+mod identity_error;
+mod issuer_parts;
+mod keycloak_user;
+mod token_response;
+pub use identity_error::IdentityError;
+pub(crate) use issuer_parts::IssuerParts;
+pub(crate) use keycloak_user::KeycloakUser;
+pub(crate) use token_response::TokenResponse;
 
 use crate::config;
 use crate::model::Contact;
-
-#[derive(Debug, Error)]
-pub enum IdentityError {
-    #[error(
-        "identity sync is not configured (set CONTACT_IDENTITY_ISSUER_URL, CONTACT_IDENTITY_CLIENT_ID, CONTACT_IDENTITY_CLIENT_SECRET)"
-    )]
-    NotConfigured,
-    #[error("invalid issuer URL: {0}")]
-    InvalidIssuer(String),
-    #[error("HTTP request failed: {0}")]
-    Http(#[from] reqwest::Error),
-    #[error("Keycloak token request failed: {0}")]
-    Token(String),
-    #[error("Keycloak user listing failed: {0}")]
-    Users(String),
-}
-
-#[derive(serde::Deserialize)]
-struct TokenResponse {
-    access_token: String,
-}
-
-#[derive(serde::Deserialize)]
-struct KeycloakUser {
-    id: String,
-    username: Option<String>,
-    email: Option<String>,
-    first_name: Option<String>,
-    last_name: Option<String>,
-    enabled: Option<bool>,
-}
-
-struct IssuerParts {
-    admin_base: String,
-    realm: String,
-}
 
 fn parse_issuer(issuer: &str) -> Result<IssuerParts, IdentityError> {
     let issuer = issuer.trim().trim_end_matches('/');

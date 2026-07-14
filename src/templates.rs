@@ -1,3 +1,12 @@
+mod contact_us_success_template;
+mod contact_us_template;
+mod form_template;
+mod index_template;
+pub(crate) use contact_us_success_template::ContactUsSuccessTemplate;
+pub(crate) use contact_us_template::ContactUsTemplate;
+pub(crate) use form_template::FormTemplate;
+pub(crate) use index_template::IndexTemplate;
+
 use askama::Template;
 
 use crate::model::{Contact, ContactInquiryForm};
@@ -21,58 +30,6 @@ fn site_nav(return_path: &str, show_contact_us: bool) -> Result<String, askama::
         show_contact_us,
         leading_html: "",
     })
-}
-
-#[derive(Template)]
-#[template(path = "contact_us.html")]
-struct ContactUsTemplate {
-    site_header: SiteHeader,
-    site_nav: String,
-    return_url: String,
-    display_name: String,
-    email: String,
-    phone: String,
-    message: String,
-    error: Option<String>,
-    identity_base_url: String,
-    copyright_years: String,
-    human_check_enabled: bool,
-    human_check_challenge_url: String,
-}
-
-#[derive(Template)]
-#[template(path = "contact_us_success.html")]
-struct ContactUsSuccessTemplate {
-    site_header: SiteHeader,
-    site_nav: String,
-    return_url: String,
-    copyright_years: String,
-}
-
-#[derive(Template)]
-#[template(path = "index.html")]
-struct IndexTemplate {
-    site_header: SiteHeader,
-    site_nav: String,
-    identity_contacts: Vec<Contact>,
-    external_contacts: Vec<Contact>,
-    identity_sync_configured: bool,
-    message: Option<String>,
-    copyright_years: String,
-}
-
-#[derive(Template)]
-#[template(path = "form.html")]
-struct FormTemplate {
-    site_header: SiteHeader,
-    site_nav: String,
-    contact: Option<Contact>,
-    display_name: String,
-    email: String,
-    phone: String,
-    notes: String,
-    error: Option<String>,
-    copyright_years: String,
 }
 
 fn partition_contacts(contacts: Vec<Contact>) -> (Vec<Contact>, Vec<Contact>) {

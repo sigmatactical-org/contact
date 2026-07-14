@@ -20,10 +20,12 @@ pub fn rejection_message(error: &HumanCheckError) -> String {
     }
 }
 
+/// Verify a submitted human-check payload field.
 pub fn verify_field(check: &HumanCheck, payload: &str) -> Result<(), HumanCheckError> {
     check.verify_payload_or_skip(payload)
 }
 
+/// Build this module's routes.
 pub fn routes(
     check: HumanCheck,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
@@ -61,6 +63,7 @@ pub fn routes(
         })
 }
 
+/// Warp filter injecting the shared HumanCheck instance.
 pub fn with_check(
     check: HumanCheck,
 ) -> impl Filter<Extract = (HumanCheck,), Error = Infallible> + Clone + Send + 'static {

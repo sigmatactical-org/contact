@@ -1,3 +1,8 @@
+mod error_body;
+mod sync_response;
+pub(crate) use error_body::ErrorBody;
+pub(crate) use sync_response::SyncResponse;
+
 use std::convert::Infallible;
 
 use warp::http::StatusCode;
@@ -8,16 +13,6 @@ use crate::SharedStore;
 use crate::identity;
 use crate::model::{CreateContact, UpdateContact};
 use crate::store::StoreError;
-
-#[derive(serde::Serialize)]
-struct SyncResponse {
-    synced: usize,
-}
-
-#[derive(serde::Serialize)]
-struct ErrorBody {
-    error: String,
-}
 
 fn json_error(status: StatusCode, message: impl Into<String>) -> Response {
     warp::reply::with_status(
@@ -56,6 +51,7 @@ fn internal_auth() -> impl Filter<Extract = (), Error = Rejection> + Clone {
         .untuple_one()
 }
 
+/// Build this module's routes.
 pub fn routes(
     store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {

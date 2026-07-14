@@ -17,6 +17,7 @@ fn return_url_allowlist() -> &'static UriAllowlist {
     RETURN_URL_ALLOWLIST.get_or_init(|| UriAllowlist::new(crate::config::return_uris()))
 }
 
+/// Build this module's routes.
 pub fn routes(
     store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
     human_check: sigma_human_check::HumanCheck,
