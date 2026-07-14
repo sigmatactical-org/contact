@@ -1,5 +1,8 @@
 # sigma-contact
 
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![MSRV](https://img.shields.io/badge/MSRV-1.97.0-blue.svg)](https://www.rust-lang.org)
+
 Contact directory for Sigma Tactical Group. Pulls users from the identity provider (Keycloak), stores external contacts locally, and exposes a simple web UI plus JSON API.
 
 **Internal / admin tool** — not customer-facing. The public storefront is [sigma-store](https://github.com/sigmatactical-org/store); this service is reached only through the [sigma-identity](https://github.com/sigmatactical-org/identity) authenticated proxy.

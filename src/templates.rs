@@ -126,7 +126,7 @@ pub fn render_contact_us_success_html(return_url: &str) -> Result<String, askama
     ContactUsSuccessTemplate {
         site_header: page_header("Sigma Contact")
             .with_breadcrumb(Breadcrumb::current("Message sent")),
-        site_nav: site_nav("/contact/success", true)?,
+        site_nav: site_nav("/contact/success", false)?,
         return_url: return_url.to_string(),
         copyright_years: copyright_years(),
     }
@@ -144,7 +144,7 @@ pub fn render_index_html(
     let (identity_contacts, external_contacts) = partition_contacts(contacts);
     IndexTemplate {
         site_header: page_header("Sigma Contact"),
-        site_nav: site_nav("/", true)?,
+        site_nav: site_nav("/", false)?,
         identity_contacts,
         external_contacts,
         identity_sync_configured,
@@ -185,7 +185,7 @@ pub fn render_form_html(
             } else {
                 "New contact"
             })),
-        site_nav: site_nav(&return_path, true)?,
+        site_nav: site_nav(&return_path, false)?,
         contact,
         display_name,
         email,
