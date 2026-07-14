@@ -2,6 +2,8 @@
 //! Shared across Sigma web services so the contact affordance looks identical
 //! everywhere.
 
+#![forbid(unsafe_code)]
+
 use askama::Template;
 
 #[derive(Template)]

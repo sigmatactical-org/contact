@@ -1,5 +1,7 @@
 //! Sigma Contact: identity directory sync and external contact management.
 
+#![forbid(unsafe_code)]
+
 mod allowlist;
 mod api;
 pub mod config;
