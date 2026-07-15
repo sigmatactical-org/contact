@@ -11,11 +11,11 @@ use askama::Template;
 
 use crate::model::{Contact, ContactInquiryForm};
 use sigma_theme::copyright_years;
-use sigma_theme::nav::{Breadcrumb, SiteHeader};
+use sigma_theme::nav::{Breadcrumb, SiteHeader, site_menu};
 use sigma_theme::site_nav::{AppSiteNav, render_app_site_nav};
 
-fn page_header(brand: &str) -> SiteHeader {
-    SiteHeader::new(brand)
+fn page_header() -> SiteHeader {
+    SiteHeader::new().with_menu(site_menu(None))
 }
 
 fn site_nav(return_path: &str, show_contact_us: bool) -> Result<String, askama::Error> {
@@ -59,7 +59,7 @@ pub fn render_contact_us_html(
         None => (String::new(), String::new(), String::new(), String::new()),
     };
     ContactUsTemplate {
-        site_header: page_header("Sigma Contact")
+        site_header: page_header()
             .with_breadcrumb(Breadcrumb::current("Contact us")),
         site_nav: site_nav("/contact", false)?,
         return_url: return_url.to_string(),
@@ -81,7 +81,7 @@ pub fn render_contact_us_html(
 /// Returns [`askama::Error`] when template rendering fails.
 pub fn render_contact_us_success_html(return_url: &str) -> Result<String, askama::Error> {
     ContactUsSuccessTemplate {
-        site_header: page_header("Sigma Contact")
+        site_header: page_header()
             .with_breadcrumb(Breadcrumb::current("Message sent")),
         site_nav: site_nav("/contact/success", false)?,
         return_url: return_url.to_string(),
@@ -100,7 +100,7 @@ pub fn render_index_html(
 ) -> Result<String, askama::Error> {
     let (identity_contacts, external_contacts) = partition_contacts(contacts);
     IndexTemplate {
-        site_header: page_header("Sigma Contact"),
+        site_header: page_header(),
         site_nav: site_nav("/", false)?,
         identity_contacts,
         external_contacts,
@@ -135,7 +135,7 @@ pub fn render_form_html(
         .map(|entry| format!("/contacts/{}/edit", entry.id))
         .unwrap_or_else(|| "/contacts/new".to_string());
     FormTemplate {
-        site_header: page_header("Sigma Contact")
+        site_header: page_header()
             .with_breadcrumb(Breadcrumb::link("/", "Contacts"))
             .with_breadcrumb(Breadcrumb::current(if contact.is_some() {
                 "Edit contact"
