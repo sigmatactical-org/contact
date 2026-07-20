@@ -1,7 +1,5 @@
 //! [`ContactInquiryForm`].
 
-#[allow(unused_imports)]
-use super::*;
 use serde::Deserialize;
 
 /// Public website contact inquiry (includes return URL for cross-site flows).

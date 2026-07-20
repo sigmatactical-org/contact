@@ -54,7 +54,7 @@
           <tr>
             <td>{{ contact.display_name }}</td>
             <td>{% if let Some(email) = contact.email.as_ref() %}{{ email }}{% else %}<span class="text-secondary">—</span>{% endif %}</td>
-            <td class="text-secondary"><small>{{ contact.updated_at }}</small></td>
+            <td class="text-secondary"><small>{{ contact.updated_at.to_rfc3339() }}</small></td>
           </tr>
           {% endfor %}
         </tbody>

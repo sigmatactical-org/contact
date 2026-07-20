@@ -113,12 +113,9 @@ pub fn render_index_html(
 ///
 /// Returns [`askama::Error`] when template rendering fails.
 pub fn render_form_html(
-    contacts: Vec<Contact>,
     contact: Option<Contact>,
     error: Option<String>,
-    _identity_sync_configured: bool,
 ) -> Result<String, askama::Error> {
-    let _ = contacts;
     let (display_name, email, phone, notes) = match contact.as_ref() {
         Some(c) => (
             c.display_name.clone(),

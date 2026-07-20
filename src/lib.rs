@@ -5,7 +5,6 @@
 mod allowlist;
 mod api;
 pub mod config;
-mod human_check;
 mod identity;
 mod model;
 mod public_contact;
@@ -20,21 +19,10 @@ use std::sync::Arc;
 use warp::Filter;
 use warp::Reply;
 
-pub use model::{Contact, ContactSource, CreateContact, UpdateContact};
+pub use model::{Contact, ContactSource};
 
 /// Shared contact store handle (`PgPool` is internally concurrent).
 pub type SharedStore = Arc<store::ContactStore>;
-
-/// Resolve listen address from **`PORT`** (default **8080**).
-#[must_use]
-pub fn listen_socket_addr_from_env() -> std::net::SocketAddr {
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-    let port: u16 = std::env::var("PORT")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(8080);
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), port)
-}
 
 fn with_store(
     store: SharedStore,
@@ -42,43 +30,36 @@ fn with_store(
     warp::any().map(move || store.clone())
 }
 
-/// Site routes: web UI, JSON API, `/up`, theme static assets, error recovery.
+/// Site routes: web UI, JSON API, `/up`, theme static assets, error recovery,
+/// and the shared security header set (CSP `connect-src` extended with the
+/// identity BFF origin).
 pub fn routes(
     store: store::ContactStore,
 ) -> impl Filter<Extract = (impl Reply,), Error = Infallible> + Clone + Send + 'static {
-    use warp::reply::with::header;
-
     let health_pool = Arc::new(store.pool().clone());
     let store = Arc::new(store);
-
-    let content_security_policy = {
-        let identity_origin = config::identity_public_origin();
-        sigma_theme::public_html_csp(&identity_origin, true)
-    };
-
     let human_check = sigma_human_check::HumanCheck::from_env();
 
-    warp::path("up")
-        .and(warp::get())
-        .map(|| warp::reply::with_status("up", warp::http::StatusCode::OK))
-        .or(sigma_pg::health::warp::health_routes(
-            "contact",
-            Some(health_pool),
-        ))
-        .or(human_check::routes(human_check.clone()))
+    let index = sigma_human_check::warp::routes(human_check.clone())
         .or(public_contact::routes(
             with_store(store.clone()),
             human_check,
         ))
         .or(web::routes(with_store(store.clone())))
-        .or(api::routes(with_store(store)))
-        .or(sigma_theme::warp::static_files())
-        .or(sigma_theme::warp::favicon())
-        .recover(sigma_theme::warp::handle_rejection)
-        .with(header("content-security-policy", content_security_policy))
-        .with(header("x-content-type-options", "nosniff"))
-        .with(header("x-frame-options", "DENY"))
-        .with(header("referrer-policy", "strict-origin-when-cross-origin"))
+        .or(api::routes(with_store(store)));
+
+    // `security_headers` captures the `&str` lifetime in its `'static` return
+    // type, so the origin has to outlive the process; cache it once.
+    static IDENTITY_ORIGIN: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    let identity_origin = IDENTITY_ORIGIN.get_or_init(config::identity_public_origin);
+
+    sigma_theme::warp::security_headers(
+        sigma_theme::warp::site_routes(
+            index,
+            sigma_pg::health::warp::health_routes("contact", Some(health_pool)),
+        ),
+        identity_origin,
+    )
 }
 
 #[cfg(test)]

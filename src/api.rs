@@ -1,12 +1,10 @@
-mod error_body;
 mod sync_response;
-pub(crate) use error_body::ErrorBody;
 pub(crate) use sync_response::SyncResponse;
 
 use std::convert::Infallible;
 
+use sigma_pg::api::{internal_auth, json_error};
 use warp::http::StatusCode;
-use warp::reply::Response;
 use warp::{Filter, Rejection, Reply};
 
 use crate::SharedStore;
@@ -14,16 +12,8 @@ use crate::identity;
 use crate::model::{CreateContact, UpdateContact};
 use crate::store::StoreError;
 
-fn json_error(status: StatusCode, message: impl Into<String>) -> Response {
-    warp::reply::with_status(
-        warp::reply::json(&ErrorBody {
-            error: message.into(),
-        }),
-        status,
-    )
-    .into_response()
-}
-
+/// Map this crate's [`StoreError`] (which adds `IdentityReadOnly` over the
+/// shared `sigma_pg::api::StoreError`) to its JSON error response status.
 fn store_error_status(err: &StoreError) -> StatusCode {
     match err {
         StoreError::NotFound => StatusCode::NOT_FOUND,
@@ -31,24 +21,6 @@ fn store_error_status(err: &StoreError) -> StatusCode {
         StoreError::InvalidInput(_) => StatusCode::BAD_REQUEST,
         StoreError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
-}
-
-fn internal_auth() -> impl Filter<Extract = (), Error = Rejection> + Clone {
-    warp::header::optional::<String>("authorization")
-        .and(warp::header::optional::<String>("x-sigma-internal-token"))
-        .and_then(
-            |authorization: Option<String>, internal_token: Option<String>| async move {
-                if sigma_pg::clients::internal::authorize_internal(
-                    authorization.as_deref(),
-                    internal_token.as_deref(),
-                ) {
-                    Ok::<_, Rejection>(())
-                } else {
-                    Err(warp::reject::not_found())
-                }
-            },
-        )
-        .untuple_one()
 }
 
 /// Build this module's routes.

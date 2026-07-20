@@ -1,8 +1,9 @@
 //! [`ContactForm`].
 
-#[allow(unused_imports)]
-use super::*;
 use serde::Deserialize;
+use sigma_pg::form::empty_to_none;
+
+use super::{CreateContact, UpdateContact};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ContactForm {

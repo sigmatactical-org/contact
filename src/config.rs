@@ -1,8 +1,4 @@
-/// PostgreSQL connection URL (shared Sigma database).
-#[must_use]
-pub fn database_url() -> String {
-    std::env::var("DATABASE_URL").unwrap_or_else(|_| sigma_pg::service_database_url("contact"))
-}
+use sigma_pg::clients::http::env_url;
 
 /// OIDC issuer URL for the identity provider (Keycloak realm URL).
 #[must_use]
@@ -36,22 +32,10 @@ pub fn identity_sync_configured() -> bool {
         && identity_client_secret().is_some()
 }
 
-fn normalize_base_url(url: &str) -> String {
-    let mut url = url.trim().to_string();
-    if !url.ends_with('/') {
-        url.push('/');
-    }
-    url
-}
-
 /// Public base URL of the identity BFF (e.g. `http://127.0.0.1:3000/`).
 #[must_use]
 pub fn identity_public_base_url() -> String {
-    std::env::var("CONTACT_IDENTITY_PUBLIC_URL")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .map(|s| normalize_base_url(&s))
-        .unwrap_or_else(|| "http://127.0.0.1:3000/".to_string())
+    env_url("CONTACT_IDENTITY_PUBLIC_URL", "http://127.0.0.1:3000")
 }
 
 /// Browser origin of the identity BFF for CSP `connect-src` (no trailing slash).
@@ -67,31 +51,19 @@ pub fn identity_public_origin() -> String {
 /// network. Falls back to the public URL for non-cluster local dev.
 #[must_use]
 pub fn identity_internal_base_url() -> String {
-    std::env::var("CONTACT_IDENTITY_INTERNAL_URL")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .map(|s| normalize_base_url(&s))
-        .unwrap_or_else(identity_public_base_url)
+    env_url("CONTACT_IDENTITY_INTERNAL_URL", &identity_public_base_url())
 }
 
 /// Public base URL of this contact service (e.g. `http://127.0.0.1:8083/`).
 #[must_use]
 pub fn public_base_url() -> String {
-    std::env::var("CONTACT_PUBLIC_BASE_URL")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .map(|s| normalize_base_url(&s))
-        .unwrap_or_else(|| "http://127.0.0.1:8083/".to_string())
+    env_url("CONTACT_PUBLIC_BASE_URL", "http://127.0.0.1:8083")
 }
 
 /// Public base URL of the cart service for navbar links.
 #[must_use]
 pub fn cart_public_base_url() -> String {
-    std::env::var("CONTACT_CART_PUBLIC_URL")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .map(|s| normalize_base_url(&s))
-        .unwrap_or_else(|| "http://127.0.0.1:8084/".to_string())
+    env_url("CONTACT_CART_PUBLIC_URL", "http://127.0.0.1:8084")
 }
 
 /// Allowed `return_url` values for the public `/contact` form.

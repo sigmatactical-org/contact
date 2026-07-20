@@ -5,7 +5,7 @@ use warp::{Filter, Rejection, Reply};
 
 use crate::SharedStore;
 use crate::identity;
-use crate::model::{ContactForm, ContactSource};
+use crate::model::{Contact, ContactForm, ContactSource};
 use crate::store::StoreError;
 use crate::templates;
 
@@ -14,7 +14,7 @@ pub fn routes(
     store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
     index_page(store.clone())
-        .or(new_contact_page(store.clone()))
+        .or(new_contact_page())
         .or(create_contact_form(store.clone()))
         .or(edit_contact_page(store.clone()))
         .or(update_contact_form(store.clone()))
@@ -36,24 +36,16 @@ fn index_page(
         })
 }
 
-fn new_contact_page(
-    store: impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone + Send + 'static,
-) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
+fn new_contact_page()
+-> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send + 'static {
     warp::path("contacts")
         .and(warp::path("new"))
         .and(warp::path::end())
         .and(warp::get())
-        .and(store)
-        .and_then(|store: SharedStore| async move {
-            let contacts = store.list().await.map_err(|_| warp::reject::not_found())?;
-            templates::render_form_html(
-                contacts,
-                None,
-                None,
-                crate::config::identity_sync_configured(),
-            )
-            .map(warp::reply::html)
-            .map_err(|_| warp::reject::not_found())
+        .and_then(|| async move {
+            templates::render_form_html(None, None)
+                .map(warp::reply::html)
+                .map_err(|_| warp::reject::not_found())
         })
 }
 
@@ -71,12 +63,9 @@ fn create_contact_form(
                     warp::redirect::redirect(warp::http::Uri::from_static("/")).into_response()
                 }
                 Err(StoreError::InvalidInput(_)) => {
-                    let contacts = store.list().await.map_err(|_| warp::reject::not_found())?;
                     match templates::render_form_html(
-                        contacts,
                         None,
                         Some("Display name is required.".to_string()),
-                        crate::config::identity_sync_configured(),
                     ) {
                         Ok(html) => warp::reply::with_status(
                             warp::reply::html(html),
@@ -109,15 +98,9 @@ fn edit_contact_page(
             if contact.source != ContactSource::External {
                 return Err(warp::reject::not_found());
             }
-            let contacts = store.list().await.map_err(|_| warp::reject::not_found())?;
-            templates::render_form_html(
-                contacts,
-                Some(contact),
-                None,
-                crate::config::identity_sync_configured(),
-            )
-            .map(warp::reply::html)
-            .map_err(|_| warp::reject::not_found())
+            templates::render_form_html(Some(contact), None)
+                .map(warp::reply::html)
+                .map_err(|_| warp::reject::not_found())
         })
 }
 
@@ -130,20 +113,21 @@ fn update_contact_form(
         .and(store)
         .and_then(
             |id: String, form: ContactForm, store: SharedStore| async move {
-                let response = match store.update_external(&id, form.into_update()).await {
+                let response = match store.update_external(&id, form.clone().into_update()).await {
                     Ok(_) => {
                         warp::redirect::redirect(warp::http::Uri::from_static("/")).into_response()
                     }
                     Err(StoreError::NotFound) => return Err(warp::reject::not_found()),
                     Err(StoreError::IdentityReadOnly) => return Err(warp::reject::not_found()),
                     Err(StoreError::InvalidInput(_)) => {
-                        let contacts = store.list().await.map_err(|_| warp::reject::not_found())?;
-                        let contact = store.get(&id).await.ok().flatten();
+                        // Re-render the edit form from the submitted values
+                        // (`InvalidInput` implies the contact exists and is
+                        // external) instead of re-querying the store.
+                        let mut contact = Contact::new_external(form.into_create());
+                        contact.id = id;
                         match templates::render_form_html(
-                            contacts,
-                            contact,
+                            Some(contact),
                             Some("Display name is required.".to_string()),
-                            crate::config::identity_sync_configured(),
                         ) {
                             Ok(html) => warp::reply::with_status(
                                 warp::reply::html(html),

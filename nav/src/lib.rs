@@ -4,13 +4,10 @@
 
 #![forbid(unsafe_code)]
 
-use askama::Template;
+mod contact_nav_template;
+use contact_nav_template::ContactNavTemplate;
 
-#[derive(Template)]
-#[template(path = "contact_nav.html")]
-struct ContactNavTemplate<'a> {
-    contact_us_url: &'a str,
-}
+use askama::Template;
 
 /// Build the contact form URL that returns the user to `return_path` on the
 /// calling app.
@@ -24,7 +21,7 @@ pub fn contact_us_url(contact_base: &str, app_base: &str, return_path: &str) -> 
     let contact_root = contact_base.trim_end_matches('/');
     format!(
         "{contact_root}/contact?return_url={}",
-        percent_encode(&app_uri)
+        urlencoding::encode(&app_uri)
     )
 }
 
@@ -44,37 +41,6 @@ fn join_url(base: &str, path: &str) -> String {
     }
     let path = path.trim_start_matches('/');
     format!("{base}/{path}")
-}
-
-fn percent_encode(value: &str) -> String {
-    let mut out = String::with_capacity(value.len());
-    for byte in value.bytes() {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(byte as char);
-            }
-            b'/' => out.push_str("%2F"),
-            b':' => out.push_str("%3A"),
-            b'?' => out.push_str("%3F"),
-            b'#' => out.push_str("%23"),
-            b'[' => out.push_str("%5B"),
-            b']' => out.push_str("%5D"),
-            b'@' => out.push_str("%40"),
-            b'!' => out.push_str("%21"),
-            b'$' => out.push_str("%24"),
-            b'&' => out.push_str("%26"),
-            b'\'' => out.push_str("%27"),
-            b'(' => out.push_str("%28"),
-            b')' => out.push_str("%29"),
-            b'*' => out.push_str("%2A"),
-            b'+' => out.push_str("%2B"),
-            b',' => out.push_str("%2C"),
-            b';' => out.push_str("%3B"),
-            b'=' => out.push_str("%3D"),
-            _ => out.push_str(&format!("%{byte:02X}")),
-        }
-    }
-    out
 }
 
 #[cfg(test)]

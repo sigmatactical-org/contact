@@ -1,9 +1,10 @@
 //! [`StoreError`].
 
-#[allow(unused_imports)]
-use super::*;
 use thiserror::Error;
 
+/// Contact store error. Unlike the shared `sigma_pg::api::StoreError` it has
+/// an [`StoreError::IdentityReadOnly`] variant (403) for writes against
+/// identity-sourced contacts.
 #[derive(Debug, Error)]
 pub enum StoreError {
     #[error("contact not found")]

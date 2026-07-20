@@ -1,10 +1,9 @@
 //! [`IndexTemplate`].
 
-#[allow(unused_imports)]
-use super::*;
-use crate::model::Contact;
 use askama::Template;
 use sigma_theme::nav::SiteHeader;
+
+use crate::model::Contact;
 
 #[derive(Template)]
 #[template(path = "index.html")]
