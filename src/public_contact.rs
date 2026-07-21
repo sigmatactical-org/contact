@@ -41,11 +41,7 @@ fn contact_form(
         .and_then(
             |query: ContactQuery, human_check: sigma_human_check::HumanCheck| async move {
                 if !return_url_is_allowed(&query.return_url) {
-                    return Ok(warp::reply::with_status(
-                        "Invalid return_url",
-                        StatusCode::BAD_REQUEST,
-                    )
-                    .into_response());
+                    return Ok(invalid_return_url());
                 }
                 templates::render_contact_us_html(&query.return_url, None, None, &human_check)
                     .map(|html| warp::reply::html(html).into_response())
@@ -77,40 +73,15 @@ fn contact_form(
                 }
 
                 if !return_url_is_allowed(&form.return_url) {
-                    return Ok(warp::reply::with_status(
-                        "Invalid return_url",
-                        StatusCode::BAD_REQUEST,
-                    )
-                    .into_response());
+                    return Ok(invalid_return_url());
                 }
                 if let Err(message) = form.validate() {
-                    let return_url = form.return_url.clone();
-                    return templates::render_contact_us_html(
-                        &return_url,
-                        Some(form),
-                        Some(message),
-                        &human_check,
-                    )
-                    .map(|html| {
-                        warp::reply::with_status(warp::reply::html(html), StatusCode::BAD_REQUEST)
-                            .into_response()
-                    })
-                    .map_err(|_| warp::reject::not_found());
+                    return contact_form_error(form, message, &human_check);
                 }
 
                 if let Err(err) = human_check.verify_payload_or_skip(&form.altcha) {
-                    let return_url = form.return_url.clone();
-                    return templates::render_contact_us_html(
-                        &return_url,
-                        Some(form),
-                        Some(sigma_human_check::rejection_message(&err)),
-                        &human_check,
-                    )
-                    .map(|html| {
-                        warp::reply::with_status(warp::reply::html(html), StatusCode::BAD_REQUEST)
-                            .into_response()
-                    })
-                    .map_err(|_| warp::reject::not_found());
+                    let message = sigma_human_check::rejection_message(&err);
+                    return contact_form_error(form, message, &human_check);
                 }
 
                 let notes = format!("Website inquiry:\n\n{}", form.message.trim());
@@ -129,21 +100,7 @@ fn contact_form(
                         Ok(warp::redirect::found(location).into_response())
                     }
                     Err(StoreError::InvalidInput(message)) => {
-                        let return_url = form.return_url.clone();
-                        templates::render_contact_us_html(
-                            &return_url,
-                            Some(form),
-                            Some(message),
-                            &human_check,
-                        )
-                        .map(|html| {
-                            warp::reply::with_status(
-                                warp::reply::html(html),
-                                StatusCode::BAD_REQUEST,
-                            )
-                            .into_response()
-                        })
-                        .map_err(|_| warp::reject::not_found())
+                        contact_form_error(form, message, &human_check)
                     }
                     Err(_) => Err(warp::reject::not_found()),
                 }
@@ -161,15 +118,33 @@ fn contact_success()
         .and(warp::query::<ContactQuery>())
         .and_then(|query: ContactQuery| async move {
             if !query.return_url.is_empty() && !return_url_is_allowed(&query.return_url) {
-                return Ok(
-                    warp::reply::with_status("Invalid return_url", StatusCode::BAD_REQUEST)
-                        .into_response(),
-                );
+                return Ok(invalid_return_url());
             }
             templates::render_contact_us_success_html(&query.return_url)
                 .map(|html| warp::reply::html(html).into_response())
                 .map_err(|_| warp::reject::not_found())
         })
+}
+
+/// 400 response for a `return_url` outside the allowlist.
+fn invalid_return_url() -> warp::reply::Response {
+    warp::reply::with_status("Invalid return_url", StatusCode::BAD_REQUEST).into_response()
+}
+
+/// Re-render the public contact form as a 400, echoing the submitted values
+/// alongside `message`.
+fn contact_form_error(
+    form: ContactInquiryForm,
+    message: String,
+    human_check: &sigma_human_check::HumanCheck,
+) -> Result<warp::reply::Response, Rejection> {
+    let return_url = form.return_url.clone();
+    templates::render_contact_us_html(&return_url, Some(form), Some(message), human_check)
+        .map(|html| {
+            warp::reply::with_status(warp::reply::html(html), StatusCode::BAD_REQUEST)
+                .into_response()
+        })
+        .map_err(|_| warp::reject::not_found())
 }
 
 fn return_url_is_allowed(return_url: &str) -> bool {
