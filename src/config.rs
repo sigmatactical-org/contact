@@ -1,27 +1,38 @@
-use sigma_pg::clients::http::env_url;
+//! Environment-driven configuration for the contact service.
+//!
+//! Required values are declared in the [`sigma_config::service!`] block and
+//! checked by [`validate_with`] at startup; optional integrations return
+//! `None` when they are not configured for this environment.
+
+sigma_config::service! {
+    prefix = "CONTACT";
+    role = "contact";
+    urls {
+        /// Public base URL of the identity BFF.
+        identity_public_base_url = "IDENTITY_PUBLIC_URL" => "http://127.0.0.1:3000/";
+        /// Public base URL of this contact service.
+        public_base_url = "PUBLIC_BASE_URL" => "http://127.0.0.1:8083/";
+        /// Public base URL of the cart service for navbar links.
+        cart_public_base_url = "CART_PUBLIC_URL" => "http://127.0.0.1:8084/";
+    }
+}
 
 /// OIDC issuer URL for the identity provider (Keycloak realm URL).
 #[must_use]
 pub fn identity_issuer_url() -> Option<String> {
-    std::env::var("CONTACT_IDENTITY_ISSUER_URL")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
+    SERVICE.opt_str("IDENTITY_ISSUER_URL")
 }
 
 /// Service-account client id for Keycloak Admin API access.
 #[must_use]
 pub fn identity_client_id() -> Option<String> {
-    std::env::var("CONTACT_IDENTITY_CLIENT_ID")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
+    SERVICE.opt_str("IDENTITY_CLIENT_ID")
 }
 
 /// Service-account client secret for Keycloak Admin API access.
 #[must_use]
 pub fn identity_client_secret() -> Option<String> {
-    std::env::var("CONTACT_IDENTITY_CLIENT_SECRET")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
+    SERVICE.opt_str("IDENTITY_CLIENT_SECRET")
 }
 
 /// Whether identity sync is configured.
@@ -32,16 +43,10 @@ pub fn identity_sync_configured() -> bool {
         && identity_client_secret().is_some()
 }
 
-/// Public base URL of the identity BFF (e.g. `http://127.0.0.1:3000/`).
-#[must_use]
-pub fn identity_public_base_url() -> String {
-    env_url("CONTACT_IDENTITY_PUBLIC_URL", "http://127.0.0.1:3000")
-}
-
 /// Browser origin of the identity BFF for CSP `connect-src` (no trailing slash).
 #[must_use]
 pub fn identity_public_origin() -> String {
-    identity_public_base_url().trim_end_matches('/').to_string()
+    sigma_config::origin_of(&identity_public_base_url())
 }
 
 /// Base URL for server-to-server calls to the identity BFF (e.g. session
@@ -51,27 +56,16 @@ pub fn identity_public_origin() -> String {
 /// network. Falls back to the public URL for non-cluster local dev.
 #[must_use]
 pub fn identity_internal_base_url() -> String {
-    env_url("CONTACT_IDENTITY_INTERNAL_URL", &identity_public_base_url())
-}
-
-/// Public base URL of this contact service (e.g. `http://127.0.0.1:8083/`).
-#[must_use]
-pub fn public_base_url() -> String {
-    env_url("CONTACT_PUBLIC_BASE_URL", "http://127.0.0.1:8083")
-}
-
-/// Public base URL of the cart service for navbar links.
-#[must_use]
-pub fn cart_public_base_url() -> String {
-    env_url("CONTACT_CART_PUBLIC_URL", "http://127.0.0.1:8084")
+    SERVICE
+        .opt_url("IDENTITY_INTERNAL_URL")
+        .unwrap_or_else(identity_public_base_url)
 }
 
 /// Allowed `return_url` values for the public `/contact` form.
 #[must_use]
 pub fn return_uris() -> Vec<String> {
-    std::env::var("CONTACT_RETURN_URIS")
-        .ok()
-        .filter(|value| !value.trim().is_empty())
+    SERVICE
+        .opt_str("RETURN_URIS")
         .map(|value| {
             value
                 .split(',')
@@ -81,4 +75,10 @@ pub fn return_uris() -> Vec<String> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// PostgreSQL connection URL (shared Sigma database).
+#[must_use]
+pub fn database_url() -> String {
+    SERVICE.database_url()
 }

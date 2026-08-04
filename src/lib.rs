@@ -61,10 +61,7 @@ mod tests {
     use warp::http::StatusCode;
 
     async fn test_store() -> store::ContactStore {
-        sigma_pg::clients::internal::ensure_test_internal_token();
-        store::ContactStore::connect_empty()
-            .await
-            .expect("PostgreSQL required for tests")
+        sigma_pg::test_helpers::ready_store(store::ContactStore::connect_empty()).await
     }
 
     /// Routes over an empty store, with the bot check off so the tests exercise

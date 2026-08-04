@@ -8,6 +8,7 @@ mod contact_nav_template;
 use contact_nav_template::ContactNavTemplate;
 
 use askama::Template;
+use sigma_config::join_url;
 
 /// Build the contact form URL that returns the user to `return_path` on the
 /// calling app.
@@ -32,15 +33,6 @@ pub fn contact_us_url(contact_base: &str, app_base: &str, return_path: &str) -> 
 /// Returns [`askama::Error`] when template rendering fails.
 pub fn render_contact_nav(contact_us_url: &str) -> Result<String, askama::Error> {
     ContactNavTemplate { contact_us_url }.render()
-}
-
-fn join_url(base: &str, path: &str) -> String {
-    let base = base.trim_end_matches('/');
-    if path == "/" || path.is_empty() {
-        return format!("{base}/");
-    }
-    let path = path.trim_start_matches('/');
-    format!("{base}/{path}")
 }
 
 #[cfg(test)]
