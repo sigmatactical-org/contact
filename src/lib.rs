@@ -24,41 +24,34 @@ pub use model::{Contact, ContactSource};
 /// Shared contact store handle (`PgPool` is internally concurrent).
 pub type SharedStore = Arc<store::ContactStore>;
 
-fn with_store(
-    store: SharedStore,
-) -> impl Filter<Extract = (SharedStore,), Error = Infallible> + Clone {
-    warp::any().map(move || store.clone())
-}
-
 /// Site routes: web UI, JSON API, `/up`, theme static assets, error recovery,
 /// and the shared security header set (CSP `connect-src` extended with the
 /// identity BFF origin).
+///
+/// `human_check` guards the public contact form and comes from the caller so
+/// that a missing secret fails startup in `main` rather than here, where the
+/// only options would be to panic or to accept unverified submissions.
 pub fn routes(
     store: store::ContactStore,
+    human_check: sigma_human_check::HumanCheck,
 ) -> impl Filter<Extract = (impl Reply,), Error = Infallible> + Clone + Send + 'static {
     let health_pool = Arc::new(store.pool().clone());
     let store = Arc::new(store);
-    let human_check = sigma_human_check::HumanCheck::from_env();
 
     let index = sigma_human_check::warp::routes(human_check.clone())
         .or(public_contact::routes(
-            with_store(store.clone()),
+            sigma_theme::warp::with_state(store.clone()),
             human_check,
         ))
-        .or(web::routes(with_store(store.clone())))
-        .or(api::routes(with_store(store)));
-
-    // `security_headers` captures the `&str` lifetime in its `'static` return
-    // type, so the origin has to outlive the process; cache it once.
-    static IDENTITY_ORIGIN: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    let identity_origin = IDENTITY_ORIGIN.get_or_init(config::identity_public_origin);
+        .or(web::routes(sigma_theme::warp::with_state(store.clone())))
+        .or(api::routes(sigma_theme::warp::with_state(store)));
 
     sigma_theme::warp::security_headers(
         sigma_theme::warp::site_routes(
             index,
             sigma_pg::health::warp::health_routes("contact", Some(health_pool)),
         ),
-        identity_origin,
+        config::identity_public_origin(),
     )
 }
 
@@ -74,12 +67,22 @@ mod tests {
             .expect("PostgreSQL required for tests")
     }
 
+    /// Routes over an empty store, with the bot check off so the tests exercise
+    /// pages and the API rather than proof-of-work.
+    async fn test_routes()
+    -> impl Filter<Extract = (impl Reply,), Error = Infallible> + Clone + Send + 'static {
+        routes(
+            test_store().await,
+            sigma_human_check::HumanCheck::disabled(),
+        )
+    }
+
     #[tokio::test]
     async fn up_returns_ok() {
         let res = warp::test::request()
             .method("GET")
             .path("/up")
-            .reply(&routes(test_store().await))
+            .reply(&test_routes().await)
             .await;
         assert_eq!(res.status(), StatusCode::OK);
     }
@@ -89,7 +92,7 @@ mod tests {
         let res = warp::test::request()
             .method("GET")
             .path("/")
-            .reply(&routes(test_store().await))
+            .reply(&test_routes().await)
             .await;
         assert_eq!(res.status(), StatusCode::OK);
         let body = std::str::from_utf8(res.body()).unwrap();
@@ -106,7 +109,7 @@ mod tests {
                 "x-sigma-internal-token",
                 sigma_pg::clients::internal::TEST_INTERNAL_TOKEN,
             )
-            .reply(&routes(test_store().await))
+            .reply(&test_routes().await)
             .await;
         assert_eq!(res.status(), StatusCode::OK);
         let body: Vec<Contact> = serde_json::from_slice(res.body()).unwrap();
@@ -123,7 +126,7 @@ mod tests {
             .body(
                 r#"{"display_name":"Ada Lovelace","email":"ada@example.com","phone":null,"notes":null}"#,
             )
-            .reply(&routes(test_store().await))
+            .reply(&test_routes().await)
             .await;
         assert_eq!(res.status(), StatusCode::CREATED);
         let contact: Contact = serde_json::from_slice(res.body()).unwrap();

@@ -28,6 +28,11 @@ Shared site chrome comes from [sigma-theme](https://github.com/sigmatactical-org
 | `CONTACT_IDENTITY_ISSUER_URL` | OIDC issuer / realm URL (e.g. `http://127.0.0.1:8101/realms/multcorp`) |
 | `CONTACT_IDENTITY_CLIENT_ID` | Service-account client id for Admin API |
 | `CONTACT_IDENTITY_CLIENT_SECRET` | Service-account client secret |
+| `HUMAN_CHECK_HMAC_SECRET` | Bot-check HMAC secret for the public form (≥32 characters) |
+| `HUMAN_CHECK_KEY_SECRET` | Bot-check key secret for the public form (≥32 characters) |
+| `HUMAN_CHECK_DISABLED` | Set `true` to accept unverified submissions (local dev only) |
+
+The public contact form is guarded by [sigma-human-check](https://github.com/sigmatactical-org/human-check), which fails closed: the service refuses to start unless both secrets are set or `HUMAN_CHECK_DISABLED=true`.
 
 Identity sync requires a Keycloak client with **service accounts enabled** and the **view-users** role on **realm-management**. In the dev realm, run `platform/scripts/seed-keycloak-dev-users.sh` to grant `view-users` on `service-account-identity`.
 
@@ -59,17 +64,42 @@ Browser clients call `/api/contacts` on the identity host (with session + CSRF);
 Standalone clone:
 
 ```bash
-./scripts/prepare-local.sh
-cargo run -p sigma-contact
+HUMAN_CHECK_DISABLED=true cargo run -p sigma-contact
 ```
 
 Under the sigma workspace (`sigma/it/contact`):
 
 ```bash
-cd sigma/it/contact && ./scripts/prepare-local.sh && cargo run -p sigma-contact
+cd sigma/it/contact
+HUMAN_CHECK_DISABLED=true cargo run -p sigma-contact
 ```
 
+Drop `HUMAN_CHECK_DISABLED` and export the two `HUMAN_CHECK_*` secrets instead to exercise the real proof-of-work widget; `HUMAN_CHECK_COST=1500` keeps it instant.
+
 Open http://localhost:8080
+
+### Shared crates
+
+`sigma-theme`, `sigma-pg`, and `sigma-human-check` are pinned git
+dependencies, so a fresh clone builds with nothing but `cargo`: the revision
+in `Cargo.toml` is fetched, and `build.rs` writes the `askama.toml` that points
+at sigma-theme's templates wherever Cargo put them.
+
+When one of those crates is checked out beside this repo and you are editing it,
+link the checkouts so your edits are picked up without a push:
+
+```bash
+./scripts/prepare-local.sh
+```
+
+That writes `[patch]` entries into `.cargo/config.toml` (gitignored) for the
+crates it finds and leaves the rest on their pinned revision; it prints what it
+linked. Undo by deleting the file. Note that building against a linked checkout
+rewrites `Cargo.lock` into path form — don't commit that; `platform`'s
+`scripts/relock.sh` restores the git-resolved lockfile CI expects.
+
+Bumping a shared crate is `platform/scripts/pin-shared-revs.sh <crate>` after
+that crate is pushed, which updates every consumer's pin at once.
 
 Example local identity sync (with dev-stack Keycloak running):
 

@@ -44,8 +44,11 @@ fn list_contacts(
         .and(internal_auth())
         .and(store)
         .and_then(|store: SharedStore| async move {
-            let contacts = store.list().await.map_err(|_| warp::reject::not_found())?;
-            Ok::<_, Rejection>(warp::reply::json(&contacts))
+            let response = match store.list().await {
+                Ok(contacts) => warp::reply::json(&contacts).into_response(),
+                Err(e) => json_error(store_error_status(&e), e.to_string()),
+            };
+            Ok::<_, Rejection>(response)
         })
 }
 
@@ -58,13 +61,10 @@ fn get_contact(
         .and(internal_auth())
         .and(store)
         .and_then(|id: String, store: SharedStore| async move {
-            match store
-                .get(&id)
-                .await
-                .map_err(|_| warp::reject::not_found())?
-            {
-                Some(contact) => Ok(warp::reply::json(&contact)),
-                None => Err(warp::reject::not_found()),
+            match store.get(&id).await {
+                Ok(Some(contact)) => Ok(warp::reply::json(&contact).into_response()),
+                Ok(None) => Err(warp::reject::not_found()),
+                Err(e) => Ok(json_error(store_error_status(&e), e.to_string())),
             }
         })
 }

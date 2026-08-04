@@ -32,13 +32,17 @@ impl ContactStore {
         &self.pool
     }
 
+    /// Every contact by display name, capped at
+    /// [`sigma_pg::list::LIST_LIMIT`] rows.
     pub async fn list(&self) -> Result<Vec<Contact>, StoreError> {
         let rows = sqlx::query(
             "SELECT id, source, identity_id, display_name, email, phone, notes, updated_at \
-             FROM contact.contacts ORDER BY lower(display_name)",
+             FROM contact.contacts ORDER BY lower(display_name) LIMIT $1",
         )
+        .bind(sigma_pg::list::LIST_LIMIT)
         .fetch_all(&self.pool)
         .await?;
+        sigma_pg::list::warn_if_at_limit("contacts", rows.len());
         Ok(rows.into_iter().map(row_to_contact).collect())
     }
 

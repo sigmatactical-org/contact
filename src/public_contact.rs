@@ -4,6 +4,7 @@ use contact_query::ContactQuery;
 use std::convert::Infallible;
 
 use sigma_human_check::warp::with_check;
+use sigma_theme::warp::internal_rejection;
 use warp::http::StatusCode;
 use warp::{Filter, Rejection, Reply};
 
@@ -45,7 +46,7 @@ fn contact_form(
                 }
                 templates::render_contact_us_html(&query.return_url, None, None, &human_check)
                     .map(|html| warp::reply::html(html).into_response())
-                    .map_err(|_| warp::reject::not_found())
+                    .map_err(|e| internal_rejection("render contact form", e))
             },
         );
 
@@ -79,7 +80,7 @@ fn contact_form(
                     return contact_form_error(form, message, &human_check);
                 }
 
-                if let Err(err) = human_check.verify_payload_or_skip(&form.altcha) {
+                if let Err(err) = human_check.verify_payload(&form.altcha) {
                     let message = sigma_human_check::rejection_message(&err);
                     return contact_form_error(form, message, &human_check);
                 }
@@ -122,7 +123,7 @@ fn contact_success()
             }
             templates::render_contact_us_success_html(&query.return_url)
                 .map(|html| warp::reply::html(html).into_response())
-                .map_err(|_| warp::reject::not_found())
+                .map_err(|e| internal_rejection("render contact success page", e))
         })
 }
 
@@ -144,7 +145,7 @@ fn contact_form_error(
             warp::reply::with_status(warp::reply::html(html), StatusCode::BAD_REQUEST)
                 .into_response()
         })
-        .map_err(|_| warp::reject::not_found())
+        .map_err(|e| internal_rejection("render contact form", e))
 }
 
 fn return_url_is_allowed(return_url: &str) -> bool {

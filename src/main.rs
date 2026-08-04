@@ -10,8 +10,14 @@ fn main() -> Result<(), BoxError> {
         .enable_all()
         .build()?
         .block_on(async move {
+            let human_check = sigma_human_check::HumanCheck::from_env()?;
             let store = sigma_contact::store::ContactStore::connect().await?;
-            sigma_theme::warp::serve("Sigma Contact", addr, sigma_contact::routes(store)).await?;
+            sigma_theme::warp::serve(
+                "Sigma Contact",
+                addr,
+                sigma_contact::routes(store, human_check),
+            )
+            .await?;
             Ok::<(), BoxError>(())
         })
 }

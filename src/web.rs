@@ -1,5 +1,6 @@
 use std::convert::Infallible;
 
+use sigma_theme::warp::internal_rejection;
 use warp::http::StatusCode;
 use warp::{Filter, Rejection, Reply};
 
@@ -29,10 +30,13 @@ fn index_page(
         .and(warp::get())
         .and(store)
         .and_then(|store: SharedStore| async move {
-            let contacts = store.list().await.map_err(|_| warp::reject::not_found())?;
+            let contacts = store
+                .list()
+                .await
+                .map_err(|e| internal_rejection("list contacts", e))?;
             templates::render_index_html(contacts, crate::config::identity_sync_configured(), None)
                 .map(warp::reply::html)
-                .map_err(|_| warp::reject::not_found())
+                .map_err(|e| internal_rejection("render contact index", e))
         })
 }
 
@@ -45,7 +49,7 @@ fn new_contact_page()
         .and_then(|| async move {
             templates::render_form_html(None, None)
                 .map(warp::reply::html)
-                .map_err(|_| warp::reject::not_found())
+                .map_err(|e| internal_rejection("render contact form", e))
         })
 }
 
@@ -91,7 +95,7 @@ fn edit_contact_page(
             let Some(contact) = store
                 .get(&id)
                 .await
-                .map_err(|_| warp::reject::not_found())?
+                .map_err(|e| internal_rejection("read contact", e))?
             else {
                 return Err(warp::reject::not_found());
             };
@@ -100,7 +104,7 @@ fn edit_contact_page(
             }
             templates::render_form_html(Some(contact), None)
                 .map(warp::reply::html)
-                .map_err(|_| warp::reject::not_found())
+                .map_err(|e| internal_rejection("render contact form", e))
         })
 }
 
@@ -178,13 +182,16 @@ fn sync_contacts_form(
                 },
                 Err(e) => Some(format!("Sync failed: {e}")),
             };
-            let contacts = store.list().await.map_err(|_| warp::reject::not_found())?;
+            let contacts = store
+                .list()
+                .await
+                .map_err(|e| internal_rejection("list contacts", e))?;
             templates::render_index_html(
                 contacts,
                 crate::config::identity_sync_configured(),
                 message,
             )
             .map(warp::reply::html)
-            .map_err(|_| warp::reject::not_found())
+            .map_err(|e| internal_rejection("render contact index", e))
         })
 }
