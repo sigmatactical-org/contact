@@ -85,15 +85,19 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn index_lists_contacts() {
+    async fn index_without_session_redirects_to_sign_in() {
         let res = warp::test::request()
             .method("GET")
             .path("/")
             .reply(&test_routes().await)
             .await;
-        assert_eq!(res.status(), StatusCode::OK);
-        let body = std::str::from_utf8(res.body()).unwrap();
-        assert!(body.contains("Contacts"));
+        assert_eq!(res.status(), StatusCode::SEE_OTHER);
+        let location = res
+            .headers()
+            .get("location")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default();
+        assert!(location.contains("/auth/login"));
     }
 
     #[tokio::test]
